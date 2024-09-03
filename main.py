@@ -9,10 +9,12 @@ from torch import nn
 import torch.nn.functional as F
 from einops import rearrange
 from torch.utils.data import Dataset, DataLoader
+from torchvision.models.video.resnet import model_urls
 from transformers import VivitImageProcessor, VivitForVideoClassification
 from huggingface_hub import hf_hub_download
 import cv2
 from vivit import ViViT
+import yaml
 
 np.random.seed(0)
 
@@ -145,7 +147,7 @@ class VideoDataset(Dataset):
                 if last_len > self.min_sequence_length * self.step:
                     self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
                     # print([annotation_file['video'], indexes, annotation[2]])
-        self.data = self.data[1:]  # TODO: remove
+        # self.data = self.data[1:]  # TODO: remove
 
     def __len__(self):
         return len(self.data)
@@ -173,7 +175,7 @@ class VideoDataset(Dataset):
         return x, y, np.array(padding_mask)
 
 
-def train_epoch(model, optimizer, data_loader, loss_history, loss_func):
+def train_epoch(model, optimizer, data_loader, loss_history, loss_func, device):
     # src: https://github.com/tristandb8/ViViT-pytorch/blob/develop/utils.py
     total_samples = len(data_loader.dataset)
     model.train()
@@ -183,9 +185,9 @@ def train_epoch(model, optimizer, data_loader, loss_history, loss_func):
         # x = data.cuda()
         # data = rearrange(x, 'b p h w c -> b p c h w').cuda()
         # target = target.type(torch.LongTensor).cuda()
-        x = data
+        x = data.to(device)
         data = rearrange(x, 'b p h w c -> b p c h w')
-        target = target.type(torch.LongTensor)
+        target = target.type(torch.LongTensor).to(device)
         # x = data
         # data = rearrange(x, 'b p h w c -> b p c h w')
         # target = target.type(torch.LongTensor)
@@ -214,40 +216,51 @@ def train_epoch(model, optimizer, data_loader, loss_history, loss_func):
             loss_history.append(loss.item())
 
 
+def load_config(cfg_path):
+    with open(cfg_path, 'r') as file:
+        cfg = yaml.safe_load(file)
+    return cfg
+
+
 if __name__ == "__main__":
 
+    config_path = 'config.yaml'
+    config = load_config(config_path)
+
+    model_config = config['model']
+    data_config = config['data']
+    train_config = config['training']
+
     num_classes = len(CLASSES)
-    batch_size = 1
-    num_epochs = 10
+    model_config['num_classes'] = num_classes
+    num_epochs = train_config['epochs']
+    learning_rate = train_config['learning_rate']
 
-    # image_processor = VivitImageProcessor.from_pretrained("google/vivit-b-16x2-kinetics400")
-    # model = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400").cuda()
-    # model = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400")
-    # model = ViViT(embed_dim=768, num_classes=num_classes, max_seq_len=16).cuda()
-    model = ViViT(embed_dim=768, num_classes=num_classes, max_seq_len=16)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = ViViT(model_config).to(device)
 
-    dataset = VideoDataset('/home/zeleznyt/Documents/Sandbox/vivit/annotations_3data.json', CLASSES, max_sequence_length=16, max_len=4)
-    train_dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    dataset = VideoDataset(data_config['meta_file'], CLASSES, max_sequence_length=data_config['num_frames'])
+    train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
+                                  drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     lr_sched = torch.optim.lr_scheduler.MultiStepLR(optimizer, [25, 50, 75])
 
     train_loss_history, test_loss_history = [], []
 
     for epoch in range(num_epochs):
         print('Epoch:', epoch)
-        # model, optimizer, data_loader, loss_history, loss_func
-        train_epoch(model, optimizer, train_dataloader, train_loss_history, criterion)
+        train_epoch(model, optimizer, train_dataloader, train_loss_history, criterion, device)
         # model, train_dataloader, criterion, optimizer = train_epoch(model, optimizer, train_dataloader, epoch, criterion)
         lr_sched.step()
 
-        if (epoch % 5 == 0):
-            if (epoch > -1):
+        if epoch % 5 == 0:
+            if epoch > 0:
                 print("ENTERING EVALUATION")
                 # train_accuracy(model,epoch, logFile, trainKitchen)
                 # validate(model,epoch, logFile, testKitchen)
-                print()
+                print("Evaluation not implemented yet")
 
     # test_dataset = VideoDataset('/home/zeleznyt/Documents/Sandbox/vivit/annotations.json', CLASSES, max_sequence_length=16, max_len=10)
     # test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True)

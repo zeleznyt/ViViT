@@ -1,6 +1,6 @@
 model:
   patch_size: 16
-  tubelet_size: 2
+  tubelet_size: 1
   embed_dim: 768
   spatial_num_heads: 12
   spatial_num_layers: 12
@@ -12,13 +12,17 @@ model:
 
 data:
   batch_size: 2
-  num_frames: 8
+  num_frames: 16
   num_channels: 3
   height: 224
   width: 224
+  meta_file: /home/zeleznyt/Documents/Sandbox/vivit/annotations_3data.json
+  shuffle: True
+  drop_last: True
+  num_workers: 0 # Higher number not supported yet because of PyAV
 
 training:
-  learning_rate: 0.001
+  learning_rate: 0.0001
   epochs: 50
-  weight_decay: 0.0001
-  optimizer: "adam"
+#  weight_decay: 0.0001
+#  optimizer: "adam"

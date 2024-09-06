@@ -9,6 +9,7 @@ model:
   num_classes: 10
   max_seq_length: 16
   image_size: 224
+  use_vit: False
 
 data:
   batch_size: 2

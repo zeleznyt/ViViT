@@ -66,6 +66,25 @@ class SpatialTransformer(nn.Module):
         return x  # Return the class token (batch_size, n_frames, embed_dim)
 
 
+class ViT(nn.Module):
+    def __init__(self):
+        super(ViT, self).__init__()
+        # Using a pretrained Vision Transformer model from torchvision
+        self.vit = vit_b_16(weights='ViT_B_16_Weights.DEFAULT')
+        self.vit.heads = nn.Identity()  # Remove the classification head
+
+    def forward(self, x):
+        b, t, c, h, w = x.shape
+        x = rearrange(x, 'b t c h w -> (b t) c h w') # flatten batch and temporal dims
+
+        # Pass through the model
+        # torchvision ViT will take care of embeddings and cls token
+        x = self.vit(x)
+        x = rearrange(x, '(b t) ... -> b t ...', b=b) # unflatten batch and temporal dims
+
+        return x # Return the class token (batch_size, n_frames, embed_dim)
+
+
 class TemporalTransformer(nn.Module):
     def __init__(self, embed_dim=768, num_heads=12, num_layers=12, seq_length=16):  # TODO: get right hyperparameters
         super(TemporalTransformer, self).__init__()
@@ -96,12 +115,15 @@ class TemporalTransformer(nn.Module):
 class ViViT(nn.Module):
     def __init__(self, config):
         super(ViViT, self).__init__()
-        self.spatial_transformer = SpatialTransformer(embed_dim=config['embed_dim'],
-                                                        num_heads=config['spatial_num_heads'],
-                                                        num_layers=config['spatial_num_layers'],
-                                                        patch_size=config['patch_size'],
-                                                        tubelet_size=config['tubelet_size'],
-                                                        image_size=config['image_size'])
+        if config['use_vit']:
+            self.spatial_transformer = ViT()
+        else:
+            self.spatial_transformer = SpatialTransformer(embed_dim=config['embed_dim'],
+                                                            num_heads=config['spatial_num_heads'],
+                                                            num_layers=config['spatial_num_layers'],
+                                                            patch_size=config['patch_size'],
+                                                            tubelet_size=config['tubelet_size'],
+                                                            image_size=config['image_size'])
         self.temporal_transformer = TemporalTransformer(embed_dim=config['embed_dim'],
                                                         num_heads=config['temporal_num_heads'],
                                                         num_layers=config['temporal_num_layers'],

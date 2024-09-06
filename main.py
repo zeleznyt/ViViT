@@ -16,12 +16,11 @@ import cv2
 from vivit import ViViT
 from dataset import VideoDataset
 import yaml
+import wandb
 
 np.random.seed(0)
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
-
-
 
 def train_epoch(model, optimizer, data_loader, loss_history, loss_func, device):
     # src: https://github.com/tristandb8/ViViT-pytorch/blob/develop/utils.py
@@ -57,6 +56,9 @@ def train_epoch(model, optimizer, data_loader, loss_history, loss_func, device):
         loss.backward()
         optimizer.step()
 
+        # Log the loss to wandb
+        wandb.log({"train_loss": loss.item()})
+
         if i % 100 == 0:
             print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
                   ' (' + '{:3.0f}'.format(100 * i / len(data_loader)) + '%)]  Loss: ' +
@@ -69,6 +71,9 @@ def load_config(cfg_path):
         cfg = yaml.safe_load(file)
     return cfg
 
+
+def init_wandb(project_name, config):
+    wandb.init(project=project_name, config=config)
 
 if __name__ == "__main__":
 
@@ -85,6 +90,7 @@ if __name__ == "__main__":
     learning_rate = train_config['learning_rate']
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = 'cpu'
     model = ViViT(model_config).to(device)
 
     dataset = VideoDataset(data_config['meta_file'], CLASSES, max_sequence_length=data_config['num_frames'])
@@ -96,6 +102,9 @@ if __name__ == "__main__":
     lr_sched = torch.optim.lr_scheduler.MultiStepLR(optimizer, [25, 50, 75])
 
     train_loss_history, test_loss_history = [], []
+
+    project_name='ViViT'
+    init_wandb(project_name, config)
 
     for epoch in range(num_epochs):
         print('Epoch:', epoch)

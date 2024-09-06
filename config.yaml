@@ -9,7 +9,7 @@ model:
   num_classes: 10
   max_seq_length: 16
   image_size: 224
-  use_vit: False
+  use_vit: True  # To use ViT encoder with Conv2d instead of tubelet with Conv3d
 
 data:
   batch_size: 2

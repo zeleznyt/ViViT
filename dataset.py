@@ -7,6 +7,9 @@ import os
 import json
 import cv2
 from torch.utils.data import Dataset, DataLoader
+import decord
+from decord import VideoReader
+
 
 
 def read_video_pyav(container, indices):
@@ -146,8 +149,13 @@ class VideoDataset(Dataset):
             index: Index of sample to be fetched.
         """
         indices = sample_frame_indices(self.data[index][1], self.step)
-        video = read_video_pyav(container=self.video_handler[self.data[index][0]], indices=indices)
+        # Old pyav approach
+        # video = read_video_pyav(container=self.video_handler[self.data[index][0]], indices=indices)
         # x = skimage.transform.resize(video, (16, 224, 224, 3), anti_aliasing=True)
+        # Use decord instead:
+        video_path = self.data[index][0]
+        decord_vr = decord.VideoReader(video_path, num_threads=1)
+        video = list(decord_vr.get_batch([indices]).asnumpy())
 
         pad_len = self.max_sequence_length - len(video)
         video_padded = np.pad(video, ((0, pad_len), (0, 0), (0, 0), (0, 0)), 'constant', constant_values=-1)

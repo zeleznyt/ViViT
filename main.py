@@ -119,7 +119,9 @@ if __name__ == "__main__":
 
     for epoch in range(num_epochs):
         print('Epoch:', epoch)
-        train_epoch(epoch, model, optimizer, train_dataloader, train_loss_history, criterion, device)
+        train_epoch(epoch, model, optimizer, train_dataloader, train_loss_history, criterion, device,
+                    log_step=train_config['log_step'], eval_step=train_config['eval_step'],
+                    save_step=train_config['save_step'])
         # model, train_dataloader, criterion, optimizer = train_epoch(model, optimizer, train_dataloader, epoch, criterion)
         lr_sched.step()
 

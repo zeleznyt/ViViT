@@ -117,6 +117,9 @@ class ViViT(nn.Module):
         super(ViViT, self).__init__()
         if config['use_vit']:
             self.spatial_transformer = ViT()
+            # Freeze pretrained ViT
+            for param in self.spatial_transformer.parameters():
+                param.requires_grad = False
         else:
             self.spatial_transformer = SpatialTransformer(embed_dim=config['embed_dim'],
                                                             num_heads=config['spatial_num_heads'],

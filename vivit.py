@@ -156,7 +156,7 @@ def load_config(cfg_path):
 
 if __name__ == '__main__':
 
-    config_path = 'config.yaml'
+    config_path = 'configs/config.yaml'
     config = load_config(config_path)
 
     data_config = config['data']

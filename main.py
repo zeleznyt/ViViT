@@ -1,3 +1,4 @@
+import argparse
 import av
 import numpy as np
 import torch
@@ -62,6 +63,15 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
         start_time = time.time()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Training script for ViViT model")
+
+    # Argument for config file
+    parser.add_argument('--config', type=str, required=True, help='Path to the config file')
+
+    # Parse arguments and return them
+    return parser.parse_args()
+
 
 def load_config(cfg_path):
     with open(cfg_path, 'r') as file:
@@ -78,9 +88,8 @@ def init_wandb(project_name, config):
     wandb.init(project=project_name, config=config)
 
 if __name__ == "__main__":
-
-    config_path = 'config.yaml'
-    config = load_config(config_path)
+    args = parse_args()
+    config = load_config(args.config)
 
     model_config = config['model']
     data_config = config['data']

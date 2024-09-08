@@ -28,8 +28,8 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
     total_samples = len(data_loader.dataset)
     model.train()
 
+    start_time = time.time()
     for i, (data, target, padding_mask) in enumerate(data_loader):
-        start_time = time.time()
         optimizer.zero_grad()
         x = data.to(device)
         data = rearrange(x, 'b p h w c -> b p c h w')
@@ -58,6 +58,8 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
 
         if (i % save_step == 0 or i == len(data_loader) - 1) and save_step != -1:
             print('Save here. Not implemented yet')
+
+        start_time = time.time()
 
 
 

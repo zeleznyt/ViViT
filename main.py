@@ -45,7 +45,8 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
 
         if i % log_step == 0 or i == len(data_loader) - 1:
             # Log to wandb
-            wandb.log({"train_loss": loss.item(), "time_per_iteration": end_time - start_time, "epoch": epoch})
+            wandb.log({"train_loss": loss.item(), "time_per_iteration": end_time - start_time, "epoch": epoch,
+                       "learning_rate": optimizer.param_groups[0]['lr']})
 
             print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
                   ' (' + '{:3.0f}'.format(100 * i / len(data_loader)) + '%)]  Loss: ' +

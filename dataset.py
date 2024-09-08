@@ -78,7 +78,8 @@ def preprocess_video(video):
 
 
 class VideoDataset(Dataset):
-    def __init__(self, meta_file, classes, frame_sample_rate=1, min_sequence_length=2, max_sequence_length=16, input_fps=25, step=1000, max_len=None):
+    def __init__(self, meta_file, classes, frame_sample_rate=1, min_sequence_length=2, max_sequence_length=16,
+                 input_fps=25, step=1000, max_len=None, video_decoder='decord'):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -96,6 +97,7 @@ class VideoDataset(Dataset):
         self.min_sequence_length = min_sequence_length
         self.max_sequence_length = max_sequence_length
         self.input_fps = input_fps
+        self.video_decoder = video_decoder
         self.step = step
         self.original_frame_step = int(1 / self.input_fps * self.step)
         if max_len is not None:  # TODO: this is just for debug
@@ -149,13 +151,16 @@ class VideoDataset(Dataset):
             index: Index of sample to be fetched.
         """
         indices = sample_frame_indices(self.data[index][1], self.step)
-        # Old pyav approach
-        # video = read_video_pyav(container=self.video_handler[self.data[index][0]], indices=indices)
-        # x = skimage.transform.resize(video, (16, 224, 224, 3), anti_aliasing=True)
-        # Use decord instead:
-        video_path = self.data[index][0]
-        decord_vr = decord.VideoReader(video_path, num_threads=1)
-        video = list(decord_vr.get_batch([indices]).asnumpy())
+        if self.video_decoder == 'pyav':
+            video_path = self.data[index][0]
+            video = read_video_pyav(container=self.video_handler[video_path], indices=indices)
+        elif self.video_decoder == 'decord':
+            video_path = self.data[index][0]
+            decord_vr = decord.VideoReader(video_path, num_threads=1)
+            video = list(decord_vr.get_batch([indices]).asnumpy())
+        else:
+            print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+            return None
 
         pad_len = self.max_sequence_length - len(video)
         video_padded = np.pad(video, ((0, pad_len), (0, 0), (0, 0), (0, 0)), 'constant', constant_values=-1)

@@ -17,53 +17,47 @@ from vivit import ViViT
 from dataset import VideoDataset
 import yaml
 import wandb
+import time
 
 np.random.seed(0)
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
-def train_epoch(model, optimizer, data_loader, loss_history, loss_func, device):
+def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, device, log_step=100, eval_step=-1, save_step=-1):
     # src: https://github.com/tristandb8/ViViT-pytorch/blob/develop/utils.py
     total_samples = len(data_loader.dataset)
     model.train()
 
     for i, (data, target, padding_mask) in enumerate(data_loader):
+        start_time = time.time()
         optimizer.zero_grad()
-        # x = data.cuda()
-        # data = rearrange(x, 'b p h w c -> b p c h w').cuda()
-        # target = target.type(torch.LongTensor).cuda()
         x = data.to(device)
         data = rearrange(x, 'b p h w c -> b p c h w')
         target = target.type(torch.LongTensor).to(device)
-        # x = data
-        # data = rearrange(x, 'b p h w c -> b p c h w')
-        # target = target.type(torch.LongTensor)
 
-        # print('train target:')
-        # print(target)
-        # pred = model(data.float(), padding_mask=padding_mask)
         pred = model(data.float())
-        # print('pred.shape')
-        # print(pred.shape)
-        # output = F.log_softmax(pred, dim=1)
-        # print('output.shape')
-        # print(output.shape)
-        # loss = F.nll_loss(output, target)
-        # output = model(data.float())
-        # print('train output:')
-        # print(output)
+
         loss = loss_func(pred, target)
         loss.backward()
         optimizer.step()
 
-        # Log the loss to wandb
-        wandb.log({"train_loss": loss.item()})
+        end_time = time.time()
 
-        if i % 100 == 0:
+        if i % log_step == 0 or i == len(data_loader) - 1:
+            # Log to wandb
+            wandb.log({"train_loss": loss.item(), "time_per_iteration": end_time - start_time, "epoch": epoch})
+
             print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
                   ' (' + '{:3.0f}'.format(100 * i / len(data_loader)) + '%)]  Loss: ' +
                   '{:6.4f}'.format(loss.item()))
             loss_history.append(loss.item())
+
+        if (i % eval_step == 0 or i == len(data_loader) - 1) and eval_step != -1:
+            print('Eval here. Not implemented yet')
+
+        if (i % save_step == 0 or i == len(data_loader) - 1) and save_step != -1:
+            print('Save here. Not implemented yet')
+
 
 
 def load_config(cfg_path):
@@ -95,7 +89,7 @@ if __name__ == "__main__":
     learning_rate = train_config['learning_rate']
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = 'cpu'
+    # device = 'cpu'
     model = ViViT(model_config).to(device)
 
     dataset = VideoDataset(data_config['meta_file'], CLASSES, max_sequence_length=data_config['num_frames'])
@@ -113,16 +107,9 @@ if __name__ == "__main__":
 
     for epoch in range(num_epochs):
         print('Epoch:', epoch)
-        train_epoch(model, optimizer, train_dataloader, train_loss_history, criterion, device)
+        train_epoch(epoch, model, optimizer, train_dataloader, train_loss_history, criterion, device)
         # model, train_dataloader, criterion, optimizer = train_epoch(model, optimizer, train_dataloader, epoch, criterion)
         lr_sched.step()
-
-        if epoch % 5 == 0:
-            if epoch > 0:
-                print("ENTERING EVALUATION")
-                # train_accuracy(model,epoch, logFile, trainKitchen)
-                # validate(model,epoch, logFile, testKitchen)
-                print("Evaluation not implemented yet")
 
     # test_dataset = VideoDataset('/home/zeleznyt/Documents/Sandbox/vivit/annotations.json', CLASSES, max_sequence_length=16, max_len=10)
     # test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True)

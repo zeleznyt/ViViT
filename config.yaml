@@ -20,10 +20,14 @@ data:
   meta_file: /home/zeleznyt/Documents/Sandbox/vivit/annotations_3data.json
   shuffle: True
   drop_last: True
-  num_workers: 0 # Higher number not supported yet because of PyAV
+  num_workers: 2 # Higher number not supported yet because of PyAV
+  video_decoder: decord
 
 training:
   learning_rate: 0.0001
   epochs: 50
+  log_step: 50
+  eval_step: 50
+  save_step: 50
 #  weight_decay: 0.0001
 #  optimizer: "adam"

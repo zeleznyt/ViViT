@@ -73,6 +73,11 @@ def load_config(cfg_path):
 
 
 def init_wandb(project_name, config):
+    system_config = ['PBS_JOBID']
+    config['system'] = {}
+    for variable in system_config:
+        if variable in os.environ.keys():
+            config['system'][variable] = os.environ[variable]
     wandb.init(project=project_name, config=config)
 
 if __name__ == "__main__":

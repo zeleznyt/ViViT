@@ -79,7 +79,7 @@ def preprocess_video(video):
 
 class VideoDataset(Dataset):
     def __init__(self, meta_file, classes, frame_sample_rate=1, min_sequence_length=2, max_sequence_length=16,
-                 input_fps=25, step=1000, max_len=None, video_decoder='decord'):
+                 input_fps=25, step=1000, video_decoder='decord'):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -100,10 +100,6 @@ class VideoDataset(Dataset):
         self.video_decoder = video_decoder
         self.step = step
         self.original_frame_step = int(1 / self.input_fps * self.step)
-        if max_len is not None:  # TODO: this is just for debug
-            self.max_len = max_len
-        else:
-            self.max_len = np.inf
 
         with open(self.meta_file, 'r') as f:
             self.meta_data = json.load(f)
@@ -119,8 +115,6 @@ class VideoDataset(Dataset):
             # print(annotation_list)
 
             for annotation in annotation_list:
-                if len(self.data) >= self.max_len:  # TODO: just for debug
-                    break
                 if annotation[2] not in self.classes:
                     continue
                 start_frame = np.ceil(annotation[0] / self.step) * self.step
@@ -130,17 +124,12 @@ class VideoDataset(Dataset):
                                int(start_frame + (i + 1) * self.max_sequence_length * self.step-self.step))
                     self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
                     # print([annotation_file['video'], indexes, annotation[2]])
-                    if len(self.data) >= self.max_len:  # TODO: just for debug
-                        break
 
-                if len(self.data) >= self.max_len:  # TODO: just for debug
-                    break
                 last_len = (end_frame - start_frame) % (self.max_sequence_length * self.step)
                 indexes = (int(end_frame - last_len), int(end_frame))
                 if last_len > self.min_sequence_length * self.step:
                     self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
                     # print([annotation_file['video'], indexes, annotation[2]])
-        # self.data = self.data[1:]  # TODO: remove
 
     def __len__(self):
         return len(self.data)

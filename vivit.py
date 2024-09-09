@@ -92,22 +92,25 @@ class TemporalTransformer(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
         self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # TODO: randn vs zeros
+        self.cls_mask = torch.zeros(1, dtype=torch.bool)
         # TODO: what to use for positional embedding
         # self.pos_embed = nn.Parameter(
         #     torch.zeros(1, 100, embed_dim))  # Adjust the 100 according to your max sequence length
         self.pos_embed = nn.Parameter(torch.empty(1, seq_length + 1, embed_dim).normal_(std=0.02))  # from BERT
 
-    def forward(self, x):
+    def forward(self, x, padding_mask=None):
         b, t, n = x.shape
 
         # Add temporal CLS token
         cls_token = repeat(self.cls_token, '() t n -> b t n', b=b)
         x = torch.cat((cls_token, x), dim=1)
+        cls_mask = repeat(self.cls_mask.unsqueeze(dim=0), '() t -> b t', b=b)
+        padding_mask = torch.cat((cls_mask, padding_mask), dim=1)
 
         # Add positional encoding
         x += self.pos_embed[:, :t + 1]
 
-        x = self.encoder(x)
+        x = self.encoder(x, src_key_padding_mask=padding_mask)
 
         return x[:, 0]  # Return the class token (B, E)
 
@@ -115,7 +118,9 @@ class TemporalTransformer(nn.Module):
 class ViViT(nn.Module):
     def __init__(self, config):
         super(ViViT, self).__init__()
+        self.config = config
         if config['use_vit']:
+            torch._assert(config['tubelet_size'] == 1, f"tubelet_size must be 1 when using use_vit==True!")
             self.spatial_transformer = ViT()
             # Freeze pretrained ViT
             for param in self.spatial_transformer.parameters():
@@ -137,14 +142,20 @@ class ViViT(nn.Module):
             nn.Linear(config['embed_dim'], config['num_classes'])
         )
 
-    def forward(self, x):
+    def forward(self, x, padding_mask):
         b, t, c, h, w = x.shape
+
+        if self.config['use_vit']:
+            step = 1
+        else:
+            step = self.config['tubelet_size']
+        padding_mask = padding_mask[:, ::step]
 
         # Process each frame with Spatial Transformer
         spatial_embeddings = self.spatial_transformer(x)
 
         # Process frame embeddings with Temporal Transformer
-        video_embedding = self.temporal_transformer(spatial_embeddings)
+        video_embedding = self.temporal_transformer(spatial_embeddings, padding_mask)
 
         # Classification
         logits = self.classifier(video_embedding)

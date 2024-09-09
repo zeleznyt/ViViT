@@ -33,10 +33,11 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
     for i, (data, target, padding_mask) in enumerate(data_loader):
         optimizer.zero_grad()
         x = data.to(device)
+        padding_mask = padding_mask.to(device)
         data = rearrange(x, 'b p h w c -> b p c h w')
         target = target.type(torch.LongTensor).to(device)
 
-        pred = model(data.float())
+        pred = model(data.float(), padding_mask)
 
         loss = loss_func(pred, target)
         loss.backward()
@@ -103,6 +104,8 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # device = 'cpu'
     model = ViViT(model_config).to(device)
+    # Move non-trainable mask to the device
+    model.temporal_transformer.cls_mask = model.temporal_transformer.cls_mask.to(device)
 
     dataset = VideoDataset(data_config['meta_file'], CLASSES, max_sequence_length=data_config['num_frames'])
     train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],

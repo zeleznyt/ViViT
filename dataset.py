@@ -109,7 +109,12 @@ class VideoDataset(Dataset):
         for annotation_file in self.meta_data:
             video_path = annotation_file['video']
             if video_path not in self.video_handler.keys():
-                self.video_handler[video_path] = av.open(video_path)
+                if self.video_decoder == 'pyav':
+                    self.video_handler[video_path] = av.open(video_path)
+                elif self.video_decoder == 'decord':
+                    self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
+                else:
+                    print('Unknown video decoder. Must be one of ["pyav", "decord"]')
 
             annotation_list = get_eaf(annotation_file['annotation'])
             # print(annotation_list)
@@ -145,7 +150,7 @@ class VideoDataset(Dataset):
             video = read_video_pyav(container=self.video_handler[video_path], indices=indices)
         elif self.video_decoder == 'decord':
             video_path = self.data[index][0]
-            decord_vr = decord.VideoReader(video_path, num_threads=1)
+            decord_vr = self.video_handler[video_path]
             video = list(decord_vr.get_batch([indices]).asnumpy())
         else:
             print('Unknown video decoder. Must be one of ["pyav", "decord"]')

@@ -9,6 +9,7 @@ import cv2
 from torch.utils.data import Dataset, DataLoader
 import decord
 from decord import VideoReader
+import matplotlib.pyplot as plt
 
 
 
@@ -77,16 +78,32 @@ def preprocess_video(video):
     return result
 
 
+def visualize_frames(video):
+    fig, axes = plt.subplots(4, 4, figsize=(8, 8))
+    for i, ax in enumerate(axes.flat):
+        ax.imshow(video[i])  # Display image
+        ax.axis('off')
+    plt.tight_layout()  # Adjust the layout
+    plt.show()
+
+
+def debug_video(video_path, indicies):
+    decord_vr = decord.VideoReader(video_path, num_threads=1)
+    video = list(decord_vr.get_batch(indicies).asnumpy())
+    visualize_frames(video)
+
+
 class VideoDataset(Dataset):
-    def __init__(self, meta_file, classes, frame_sample_rate=1, min_sequence_length=2, max_sequence_length=16,
+    def __init__(self, meta_file, classes, frame_sample_rate=0.5, min_sequence_length=2, max_sequence_length=16,
                  input_fps=25, step=1000, video_decoder='decord'):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
             classes (`list`): List of classes
-            frame_sample_rate (`int`): Frame sampling
-            min_sequence_length (`int`): Minimum number of frames in sequence
-            max_sequence_length (`int`): Maximum number of frames in sequence
+            frame_sample_rate (`float`): Frame sampling per second. (5 for processing frame each 5th second)
+                                         If not result frame index not int, the number is floored (mainly for rate < 1)
+            min_sequence_length (`int`): Minimum number of frames in a sequence
+            max_sequence_length (`int`): Maximum number of frames in a sequence
             input_fps (`int`): Frame sampling of input video
             step (`int`): Number of annotation time steps in one second (1000 for milliseconds)
         """
@@ -99,7 +116,7 @@ class VideoDataset(Dataset):
         self.input_fps = input_fps
         self.video_decoder = video_decoder
         self.step = step
-        self.original_frame_step = int(1 / self.input_fps * self.step)
+        sampling = self.input_fps * self.frame_sample_rate
 
         with open(self.meta_file, 'r') as f:
             self.meta_data = json.load(f)
@@ -117,24 +134,25 @@ class VideoDataset(Dataset):
                     print('Unknown video decoder. Must be one of ["pyav", "decord"]')
 
             annotation_list = get_eaf(annotation_file['annotation'])
-            # print(annotation_list)
 
             for annotation in annotation_list:
                 if annotation[2] not in self.classes:
                     continue
-                start_frame = np.ceil(annotation[0] / self.step) * self.step
-                end_frame = np.floor(annotation[1] / self.step) * self.step
-                for i in range(int((end_frame - start_frame) / (self.max_sequence_length * self.step))):
-                    indexes = (int(start_frame + (i * self.max_sequence_length * self.step)),
-                               int(start_frame + (i + 1) * self.max_sequence_length * self.step-self.step))
-                    self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
-                    # print([annotation_file['video'], indexes, annotation[2]])
 
-                last_len = (end_frame - start_frame) % (self.max_sequence_length * self.step)
-                indexes = (int(end_frame - last_len), int(end_frame))
-                if last_len > self.min_sequence_length * self.step:
-                    self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
-                    # print([annotation_file['video'], indexes, annotation[2]])
+                start_frame = int(annotation[0] / self.step * self.input_fps)
+                end_frame = int(annotation[1] / self.step * self.input_fps)
+                for i in range(int(np.ceil((end_frame - start_frame) /
+                                           (self.max_sequence_length * self.input_fps * self.frame_sample_rate)))):
+                    indexes = list(np.arange(start_frame + i * self.max_sequence_length * sampling,
+                                             start_frame + (i + 1) * self.max_sequence_length * sampling,
+                                             sampling).astype(int))
+                    if indexes[-1] <= end_frame and len(indexes) >= self.min_sequence_length:
+                        self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
+                    else:
+                        last_len = (end_frame - start_frame) % (self.max_sequence_length * sampling)
+                        indexes = list(np.arange(end_frame - last_len, end_frame, sampling).astype(int))
+                        if len(indexes) >= self.min_sequence_length:
+                            self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
 
     def __len__(self):
         return len(self.data)
@@ -144,14 +162,14 @@ class VideoDataset(Dataset):
         Args:
             index: Index of sample to be fetched.
         """
-        indices = sample_frame_indices(self.data[index][1], self.step)
+        indices = self.data[index][1]
         if self.video_decoder == 'pyav':
             video_path = self.data[index][0]
             video = read_video_pyav(container=self.video_handler[video_path], indices=indices)
         elif self.video_decoder == 'decord':
             video_path = self.data[index][0]
             decord_vr = self.video_handler[video_path]
-            video = list(decord_vr.get_batch([indices]).asnumpy())
+            video = list(decord_vr.get_batch(indices).asnumpy())
         else:
             print('Unknown video decoder. Must be one of ["pyav", "decord"]')
             return None
@@ -161,8 +179,6 @@ class VideoDataset(Dataset):
 
         padding_mask = [False] * len(video) + [True] * pad_len
 
-        # image_processor = VivitImageProcessor.from_pretrained("google/vivit-b-16x2-kinetics400")
-        # x = image_processor(list(video), return_tensors="pt")
         video_padded = preprocess_video(video_padded)
         x = np.stack(video_padded)
         y = self.data[index][2]

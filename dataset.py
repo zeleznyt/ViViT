@@ -78,23 +78,25 @@ def preprocess_video(video):
     return result
 
 
-def visualize_frames(video):
+def visualize_frames(video, label=None):
     fig, axes = plt.subplots(4, 4, figsize=(8, 8))
     for i, ax in enumerate(axes.flat):
         ax.imshow(video[i])  # Display image
         ax.axis('off')
+    if label is not None:
+        plt.suptitle(label)
     plt.tight_layout()  # Adjust the layout
     plt.show()
 
 
-def debug_video(video_path, indicies):
+def debug_indicies(video_path, indicies):
     decord_vr = decord.VideoReader(video_path, num_threads=1)
     video = list(decord_vr.get_batch(indicies).asnumpy())
     visualize_frames(video)
 
 
 class VideoDataset(Dataset):
-    def __init__(self, meta_file, classes, frame_sample_rate=0.5, min_sequence_length=2, max_sequence_length=16,
+    def __init__(self, meta_file, classes, frame_sample_rate=1, min_sequence_length=2, max_sequence_length=16,
                  input_fps=25, step=1000, video_decoder='decord'):
         """
         Args:

@@ -16,21 +16,24 @@ from huggingface_hub import hf_hub_download
 import cv2
 from vivit import ViViT
 from dataset import VideoDataset
+from dataset import visualize_frames
 import yaml
 import wandb
 import time
+import matplotlib.pyplot as plt
 
 np.random.seed(0)
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
-def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, device, log_step=100, eval_step=-1, save_step=-1):
+def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1):
     # src: https://github.com/tristandb8/ViViT-pytorch/blob/develop/utils.py
     total_samples = len(data_loader.dataset)
     model.train()
 
     start_time = time.time()
     for i, (data, target, padding_mask) in enumerate(data_loader):
+        visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
         optimizer.zero_grad()
         x = data.to(device)
         padding_mask = padding_mask.to(device)
@@ -47,7 +50,7 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
 
         if i % log_step == 0 or i == len(data_loader) - 1:
             # Log to wandb
-            wandb.log({"train_loss": loss.item(), "time_per_iterations": end_time - start_time, "epoch": epoch,
+            wandb.log({"train_loss": loss.item(), "time_per_iteration": (end_time - start_time)/log_step, "epoch": epoch,
                        "learning_rate": optimizer.param_groups[0]['lr']})
 
             print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
@@ -60,8 +63,10 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
             print('Eval here. Not implemented yet')
 
         if (i % save_step == 0 or i == len(data_loader) - 1) and save_step != -1:
-            print('Save here. Not implemented yet')
-
+            model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pt'.format(epoch, i))
+            os.makedirs(checkpoint_save_dir, exist_ok=True)
+            torch.save(model.state_dict(), model_path)
+            print('Model successfully saved to {}'.format(model_path))
 
 
 def parse_args():
@@ -88,7 +93,40 @@ def init_wandb(project_name, config):
             config['system'][variable] = os.environ[variable]
     wandb.init(project=project_name, config=config)
 
+
+def dataset_distribution(dataset, plot=False):
+    class_counts = {}
+    print('Counting classes...')
+    for data in dataset:
+        _, class_label, _ = data
+
+        if class_label not in class_counts:
+            class_counts[class_label] = 0
+        class_counts[class_label] += 1
+
+    print("Number of samples per class:")
+    for class_label, count in class_counts.items():
+        print(f"Class {CLASSES[class_label]}: {count} samples")
+
+    if plot:
+        class_labels = list(class_counts.keys())
+        class_labels = [CLASSES[c] for c in class_labels]
+        counts = list(class_counts.values())
+
+        plt.figure(figsize=(10, 6))
+        plt.bar(class_labels, counts)
+
+        plt.xlabel('Class Labels')
+        plt.ylabel('Number of Samples')
+        plt.title('Number of Samples per Class')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+    return class_counts
+
+
 if __name__ == "__main__":
+    # Process args and config
     args = parse_args()
     config = load_config(args.config)
 
@@ -107,15 +145,23 @@ if __name__ == "__main__":
     # Move non-trainable mask to the device
     model.temporal_transformer.cls_mask = model.temporal_transformer.cls_mask.to(device)
 
-    dataset = VideoDataset(data_config['meta_file'], CLASSES, max_sequence_length=data_config['num_frames'])
+    print('Loading dataset...')
+    dataset = VideoDataset(data_config['meta_file'], CLASSES, frame_sample_rate=data_config['frame_sample_rate'],
+                           min_sequence_length=data_config['min_sequence_length'],
+                           max_sequence_length=data_config['max_sequence_length'],
+                           video_decoder=data_config['video_decoder'],)
     train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
+    print('Dataset successfully loaded.')
 
+    dataset_distribution(dataset, True)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     lr_sched = torch.optim.lr_scheduler.MultiStepLR(optimizer, [25, 50, 75])
 
     train_loss_history, test_loss_history = [], []
+
+    model_name = 'ViVit-B_{}x{}'.format(model_config['patch_size'], model_config['tubelet_size'])
 
     project_name='ViViT'
     init_wandb(project_name, config)
@@ -124,7 +170,8 @@ if __name__ == "__main__":
         print('Epoch:', epoch)
         train_epoch(epoch, model, optimizer, train_dataloader, train_loss_history, criterion, device,
                     log_step=train_config['log_step'], eval_step=train_config['eval_step'],
-                    save_step=train_config['save_step'])
+                    save_step=train_config['save_step'],
+                    checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name))
         # model, train_dataloader, criterion, optimizer = train_epoch(model, optimizer, train_dataloader, epoch, criterion)
         lr_sched.step()
 

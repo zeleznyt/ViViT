@@ -26,11 +26,13 @@ data:
   video_decoder: decord
 
 training:
-  learning_rate: 0.0001
+  learning_rate: 0.25
+  warmup_epochs: 2.5
+  lr_scheduler: cosine
+  optimizer: adam
   epochs: 50
   log_step: 50
   eval_step: 50
   save_step: 50
   checkpoint_save_dir: /media/zeleznyt/DATA/repo/ViViT/checkpoints
 #  weight_decay: 0.0001
-#  optimizer: "adam"

@@ -33,7 +33,8 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
 
     start_time = time.time()
     for i, (data, target, padding_mask) in enumerate(data_loader):
-        visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
+        # Use this to visualize th data
+        # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
         optimizer.zero_grad()
         x = data.to(device)
         padding_mask = padding_mask.to(device)
@@ -45,6 +46,7 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
         loss = loss_func(pred, target)
         loss.backward()
         optimizer.step()
+        lr_sched.step()
 
         end_time = time.time()
 
@@ -137,6 +139,7 @@ if __name__ == "__main__":
     num_classes = len(CLASSES)
     model_config['num_classes'] = num_classes
     num_epochs = train_config['epochs']
+    warmup_epochs = train_config['warmup_epochs']
     learning_rate = train_config['learning_rate']
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -155,9 +158,31 @@ if __name__ == "__main__":
     print('Dataset successfully loaded.')
 
     # dataset_distribution(dataset, True)
+
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    lr_sched = torch.optim.lr_scheduler.MultiStepLR(optimizer, [25, 50, 75])
+    if train_config['optimizer'] == 'adam':
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    else:
+        print('Unknown optimizer. Must be one of ["adam"]. Setting "adam" instead...')
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    steps_per_epoch = len(train_dataloader)
+    if train_config['lr_scheduler'] == 'cosine':
+        lr_sched = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
+                                                              T_max=(num_epochs - warmup_epochs) * steps_per_epoch)
+    elif train_config['lr_scheduler'] == 'constant':
+        lr_sched = torch.optim.lr_scheduler.ConstantLR(optimizer)
+    elif train_config['lr_scheduler'] == 'multistep':
+        lr_sched = torch.optim.lr_scheduler.MultiStepLR(optimizer, [25, 50, 75])
+    else:
+        print('Unknown optimizer. Must be one of ["cosine", "constant", "multistep"]. Setting "constant" instead]...')
+        lr_sched = torch.optim.lr_scheduler.ConstantLR(optimizer)
+
+    if train_config['warmup_epochs'] > 0:
+        warmup_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1e-6, end_factor=1.0,
+                                    total_iters=int(warmup_epochs * steps_per_epoch))
+        lr_sched = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup_scheduler, lr_sched],
+                                 milestones=[int(warmup_epochs * steps_per_epoch)])
 
     train_loss_history, test_loss_history = [], []
 
@@ -173,7 +198,6 @@ if __name__ == "__main__":
                     save_step=train_config['save_step'],
                     checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name))
         # model, train_dataloader, criterion, optimizer = train_epoch(model, optimizer, train_dataloader, epoch, criterion)
-        lr_sched.step()
 
     # test_dataset = VideoDataset('/home/zeleznyt/Documents/Sandbox/vivit/annotations.json', CLASSES, max_sequence_length=16, max_len=10)
     # test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True)

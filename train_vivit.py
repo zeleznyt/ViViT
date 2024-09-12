@@ -154,7 +154,7 @@ if __name__ == "__main__":
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     print('Dataset successfully loaded.')
 
-    dataset_distribution(dataset, True)
+    # dataset_distribution(dataset, True)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     lr_sched = torch.optim.lr_scheduler.MultiStepLR(optimizer, [25, 50, 75])

@@ -122,9 +122,6 @@ class ViViT(nn.Module):
         if config['use_vit']:
             torch._assert(config['tubelet_size'] == 1, f"tubelet_size must be 1 when using use_vit==True!")
             self.spatial_transformer = ViT()
-            # Freeze pretrained ViT
-            for param in self.spatial_transformer.parameters():
-                param.requires_grad = False
         else:
             self.spatial_transformer = SpatialTransformer(embed_dim=config['embed_dim'],
                                                             num_heads=config['spatial_num_heads'],

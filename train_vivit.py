@@ -25,7 +25,7 @@ from collections import defaultdict
 import random
 from torch.utils.data import Subset
 
-np.random.seed(0)
+np.random.seed(42)
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
@@ -56,7 +56,9 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
         if i % log_step == 0 or i == len(data_loader) - 1:
             # Log to wandb
             if report_to == 'wandb':
-                wandb.log({"train_loss": loss.item(), "time_per_iteration": (end_time - start_time)/log_step, "epoch": epoch,
+                wandb.log({"train_loss": loss.item(),
+                           "time_per_iteration": (end_time - start_time) / log_step,
+                           "epoch": epoch,
                            "learning_rate": optimizer.param_groups[0]['lr']})
 
             print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
@@ -183,8 +185,10 @@ if __name__ == "__main__":
     criterion = nn.CrossEntropyLoss()
     if train_config['optimizer'] == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    elif train_config['optimizer'] == 'sgd':
+        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
     else:
-        print('Unknown optimizer. Must be one of ["adam"]. Setting "adam" instead...')
+        print('Unknown optimizer. Must be one of ["adam", "sgd"]. Setting "adam" instead...')
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
     steps_per_epoch = len(train_dataloader)

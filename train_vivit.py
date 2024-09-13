@@ -29,13 +29,44 @@ np.random.seed(42)
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
-def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None):
+
+def evaluate(model, data_loader, loss_func, device):
+    model.eval()
+    loss = 0
+    correct_predictions = 0
+    total_predictions = 0
+    for i, (data, target, padding_mask) in enumerate(data_loader):
+        # Use this to visualize th data
+        # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
+        optimizer.zero_grad()
+        x = data.to(device)
+        padding_mask = padding_mask.to(device)
+        data = rearrange(x, 'b p h w c -> b p c h w')
+        target = target.type(torch.LongTensor).to(device)
+
+        pred = model(data.float(), padding_mask)
+        # logits = np.squeeze(pred.cpu().detach().numpy())
+
+        loss += loss_func(pred, target)
+
+        predicted_class = pred.argmax(dim=1)  # Get the predicted class
+        correct_predictions += (predicted_class == target).sum().item()  # Count correct predictions
+        total_predictions += target.size(0)  # Total number of predictions
+
+        # print(target.item(), pred.argmax().item())
+        # print(logits)
+    loss = loss / len(data_loader)
+    accuracy = correct_predictions / total_predictions
+    return loss, accuracy
+
+
+def train_epoch(epoch, model, optimizer, train_data_loader, eval_data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None):
     # src: https://github.com/tristandb8/ViViT-pytorch/blob/develop/utils.py
-    total_samples = len(data_loader.dataset)
+    total_samples = len(train_data_loader.dataset)
     model.train()
 
     start_time = time.time()
-    for i, (data, target, padding_mask) in enumerate(data_loader):
+    for i, (data, target, padding_mask) in enumerate(train_data_loader):
         # Use this to visualize th data
         # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
         optimizer.zero_grad()
@@ -53,7 +84,7 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
 
         end_time = time.time()
 
-        if i % log_step == 0 or i == len(data_loader) - 1:
+        if i % log_step == 0 or i == len(train_data_loader) - 1:
             # Log to wandb
             if report_to == 'wandb':
                 wandb.log({"train_loss": loss.item(),
@@ -62,15 +93,17 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
                            "learning_rate": optimizer.param_groups[0]['lr']})
 
             print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
-                  ' (' + '{:3.0f}'.format(100 * i / len(data_loader)) + '%)]  Loss: ' +
+                  ' (' + '{:3.0f}'.format(100 * i / len(train_data_loader)) + '%)]  Loss: ' +
                   '{:6.4f}'.format(loss.item()))
             loss_history.append(loss.item())
             start_time = time.time()
 
-        if (i % eval_step == 0 or i == len(data_loader) - 1) and eval_step != -1:
-            print('Eval here. Not implemented yet')
+        if (i % eval_step == 0 or i == len(train_data_loader) - 1) and eval_step != -1:
+            print('Evaluation started.')
+            eval_loss, acc = evaluate(model, eval_data_loader, loss_func, device)
+            print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')
 
-        if (i % save_step == 0 or i == len(data_loader) - 1) and save_step != -1:
+        if (i % save_step == 0 or i == len(train_data_loader) - 1) and save_step != -1:
             model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pt'.format(epoch, i))
             os.makedirs(checkpoint_save_dir, exist_ok=True)
             torch.save(model.state_dict(), model_path)
@@ -169,19 +202,22 @@ if __name__ == "__main__":
     # Move non-trainable mask to the device
     model.temporal_transformer.cls_mask = model.temporal_transformer.cls_mask.to(device)
 
+    # Create dataset
     print('Loading dataset...')
     dataset = VideoDataset(data_config['meta_file'], CLASSES, frame_sample_rate=data_config['frame_sample_rate'],
                            min_sequence_length=data_config['min_sequence_length'],
                            max_sequence_length=data_config['max_sequence_length'],
                            video_decoder=data_config['video_decoder'],)
     if train_config['balance_dataset']:
-        dataset = create_balanced_subset(dataset, 10)
+        dataset = create_balanced_subset(dataset, 1)  # TODO: return
+        # dataset = Subset(dataset, [0, 1, 2, 3])
     train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     print('Dataset successfully loaded.')
 
     # dataset_distribution(dataset, True)
 
+    # Set Loss, optimizer and cheduler
     criterion = nn.CrossEntropyLoss()
     if train_config['optimizer'] == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -219,7 +255,12 @@ if __name__ == "__main__":
 
     for epoch in range(num_epochs):
         print('Epoch:', epoch)
-        train_epoch(epoch, model, optimizer, train_dataloader, train_loss_history, criterion, device,
+        train_epoch(epoch, model, optimizer,
+                    train_data_loader=train_dataloader,
+                    eval_data_loader=train_dataloader,
+                    loss_history=train_loss_history,
+                    loss_func=criterion,
+                    device=device,
                     log_step=train_config['log_step'], eval_step=train_config['eval_step'],
                     save_step=train_config['save_step'],
                     checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name),
@@ -229,6 +270,7 @@ if __name__ == "__main__":
     # test_dataset = VideoDataset('/home/zeleznyt/Documents/Sandbox/vivit/annotations.json', CLASSES, max_sequence_length=16, max_len=10)
     # test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
+    evaluate(model, train_dataloader, criterion, device)
     test_data = next(iter(train_dataloader))
     test_video = test_data[0]
     # test_video = rearrange(test_video, 'b p h w c -> b p c h w').cuda()

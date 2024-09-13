@@ -2,18 +2,12 @@ import argparse
 import av
 import numpy as np
 import torch
-import xml.etree.ElementTree as ET
-import sys
 import os
 import json
 from torch import nn
 import torch.nn.functional as F
 from einops import rearrange
 from torch.utils.data import Dataset, DataLoader
-from torchvision.models.video.resnet import model_urls
-from transformers import VivitImageProcessor, VivitForVideoClassification
-from huggingface_hub import hf_hub_download
-import cv2
 from vivit import ViViT
 from dataset import VideoDataset
 from dataset import visualize_frames

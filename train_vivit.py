@@ -136,13 +136,15 @@ def create_balanced_subset(dataset, n_of_instances=-1):
     for idx, data in enumerate(dataset):
         _, class_label, _ = data
         class_indices[class_label].append(idx)
-    if n_of_instances < 0:
-        n_of_instances = min(len(indices) for indices in class_indices.values())
+    min_class_count = min(len(indices) for indices in class_indices.values())
+    if n_of_instances < 0 or n_of_instances > min_class_count:
+        n_of_instances = min_class_count
     balanced_indices = []
     for class_label, indices in class_indices.items():
         balanced_indices.extend(random.sample(indices, n_of_instances))
-
-    return Subset(dataset, balanced_indices)
+    balanced_subset = Subset(dataset, balanced_indices)
+    print('Balanced subset created with {} instances for each class.'.format(n_of_instances))
+    return balanced_subset
 
 if __name__ == "__main__":
     # Process args and config
@@ -216,7 +218,8 @@ if __name__ == "__main__":
         train_epoch(epoch, model, optimizer, train_dataloader, train_loss_history, criterion, device,
                     log_step=train_config['log_step'], eval_step=train_config['eval_step'],
                     save_step=train_config['save_step'],
-                    checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name))
+                    checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name),
+                    report_to=train_config['report_to'])
         # model, train_dataloader, criterion, optimizer = train_epoch(model, optimizer, train_dataloader, epoch, criterion)
 
     # test_dataset = VideoDataset('/home/zeleznyt/Documents/Sandbox/vivit/annotations.json', CLASSES, max_sequence_length=16, max_len=10)

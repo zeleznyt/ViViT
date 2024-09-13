@@ -191,7 +191,6 @@ if __name__ == "__main__":
     learning_rate = train_config['learning_rate']
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # device = 'cpu'
     model = ViViT(model_config).to(device)
     # Move non-trainable mask to the device
     model.temporal_transformer.cls_mask = model.temporal_transformer.cls_mask.to(device)
@@ -203,8 +202,7 @@ if __name__ == "__main__":
                            max_sequence_length=data_config['max_sequence_length'],
                            video_decoder=data_config['video_decoder'],)
     if train_config['balance_dataset']:
-        dataset = create_balanced_subset(dataset, 1)  # TODO: return
-        # dataset = Subset(dataset, [0, 1, 2, 3])
+        dataset = create_balanced_subset(dataset, 10)  # TODO: return
     train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     print('Dataset successfully loaded.')

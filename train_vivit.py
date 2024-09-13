@@ -29,28 +29,29 @@ def evaluate(model, data_loader, loss_func, device):
     loss = 0
     correct_predictions = 0
     total_predictions = 0
-    for i, (data, target, padding_mask) in enumerate(data_loader):
-        # Use this to visualize th data
-        # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
-        optimizer.zero_grad()
-        x = data.to(device)
-        padding_mask = padding_mask.to(device)
-        data = rearrange(x, 'b p h w c -> b p c h w')
-        target = target.type(torch.LongTensor).to(device)
+    with torch.no_grad():
+        for i, (data, target, padding_mask) in enumerate(data_loader):
+            # Use this to visualize th data
+            # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
+            optimizer.zero_grad()
+            x = data.to(device)
+            padding_mask = padding_mask.to(device)
+            data = rearrange(x, 'b p h w c -> b p c h w')
+            target = target.type(torch.LongTensor).to(device)
 
-        pred = model(data.float(), padding_mask)
-        # logits = np.squeeze(pred.cpu().detach().numpy())
+            pred = model(data.float(), padding_mask)
+            # logits = np.squeeze(pred.cpu().detach().numpy())
 
-        loss += loss_func(pred, target)
+            loss += loss_func(pred, target).item()
 
-        predicted_class = pred.argmax(dim=1)  # Get the predicted class
-        correct_predictions += (predicted_class == target).sum().item()  # Count correct predictions
-        total_predictions += target.size(0)  # Total number of predictions
+            predicted_class = pred.argmax(dim=1)  # Get the predicted class
+            correct_predictions += (predicted_class == target).sum().item()  # Count correct predictions
+            total_predictions += target.size(0)  # Total number of predictions
 
         # print(target.item(), pred.argmax().item())
         # print(logits)
-    loss = loss / len(data_loader)
-    accuracy = correct_predictions / total_predictions
+        loss = loss / len(data_loader)
+        accuracy = correct_predictions / total_predictions
     return loss, accuracy
 
 

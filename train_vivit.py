@@ -21,12 +21,15 @@ import yaml
 import wandb
 import time
 import matplotlib.pyplot as plt
+from collections import defaultdict
+import random
+from torch.utils.data import Subset
 
 np.random.seed(0)
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
-def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1):
+def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None):
     # src: https://github.com/tristandb8/ViViT-pytorch/blob/develop/utils.py
     total_samples = len(data_loader.dataset)
     model.train()
@@ -52,8 +55,9 @@ def train_epoch(epoch, model, optimizer, data_loader, loss_history, loss_func, d
 
         if i % log_step == 0 or i == len(data_loader) - 1:
             # Log to wandb
-            wandb.log({"train_loss": loss.item(), "time_per_iteration": (end_time - start_time)/log_step, "epoch": epoch,
-                       "learning_rate": optimizer.param_groups[0]['lr']})
+            if report_to == 'wandb':
+                wandb.log({"train_loss": loss.item(), "time_per_iteration": (end_time - start_time)/log_step, "epoch": epoch,
+                           "learning_rate": optimizer.param_groups[0]['lr']})
 
             print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
                   ' (' + '{:3.0f}'.format(100 * i / len(data_loader)) + '%)]  Loss: ' +
@@ -127,6 +131,19 @@ def dataset_distribution(dataset, plot=False):
     return class_counts
 
 
+def create_balanced_subset(dataset, n_of_instances=-1):
+    class_indices = defaultdict(list)
+    for idx, data in enumerate(dataset):
+        _, class_label, _ = data
+        class_indices[class_label].append(idx)
+    if n_of_instances < 0:
+        n_of_instances = min(len(indices) for indices in class_indices.values())
+    balanced_indices = []
+    for class_label, indices in class_indices.items():
+        balanced_indices.extend(random.sample(indices, n_of_instances))
+
+    return Subset(dataset, balanced_indices)
+
 if __name__ == "__main__":
     # Process args and config
     args = parse_args()
@@ -153,6 +170,8 @@ if __name__ == "__main__":
                            min_sequence_length=data_config['min_sequence_length'],
                            max_sequence_length=data_config['max_sequence_length'],
                            video_decoder=data_config['video_decoder'],)
+    if train_config['balance_dataset']:
+        dataset = create_balanced_subset(dataset, 10)
     train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     print('Dataset successfully loaded.')
@@ -189,7 +208,8 @@ if __name__ == "__main__":
     model_name = 'ViVit-B_{}x{}'.format(model_config['patch_size'], model_config['tubelet_size'])
 
     project_name='ViViT'
-    init_wandb(project_name, config)
+    if train_config['report_to'] == 'wandb':
+        init_wandb(project_name, config)
 
     for epoch in range(num_epochs):
         print('Epoch:', epoch)

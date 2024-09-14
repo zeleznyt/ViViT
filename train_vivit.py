@@ -204,7 +204,7 @@ if __name__ == "__main__":
                            max_sequence_length=data_config['max_sequence_length'],
                            video_decoder=data_config['video_decoder'],)
     if train_config['balance_dataset']:
-        dataset = create_balanced_subset(dataset, 10)  # TODO: return
+        dataset = create_balanced_subset(dataset)
     train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     print('Dataset successfully loaded.')
@@ -243,7 +243,7 @@ if __name__ == "__main__":
 
     model_name = 'ViVit-B_{}x{}'.format(model_config['patch_size'], model_config['tubelet_size'])
 
-    project_name='ViViT'
+    project_name = 'ViViT'
     if train_config['report_to'] == 'wandb':
         init_wandb(project_name, config)
 
@@ -259,21 +259,10 @@ if __name__ == "__main__":
                     save_step=train_config['save_step'],
                     checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name),
                     report_to=train_config['report_to'])
-        # model, train_dataloader, criterion, optimizer = train_epoch(model, optimizer, train_dataloader, epoch, criterion)
 
-    # test_dataset = VideoDataset('/home/zeleznyt/Documents/Sandbox/vivit/annotations.json', CLASSES, max_sequence_length=16, max_len=10)
-    # test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    print('Training finished.')
+    model_path = os.path.join(os.path.join(train_config['checkpoint_save_dir'], model_name), 'model_final.pt')
+    os.makedirs(os.path.join(train_config['checkpoint_save_dir'], model_name), exist_ok=True)
+    torch.save(model.state_dict(), model_path)
+    print('Model successfully saved to {}'.format(model_path))
 
-    evaluate(model, train_dataloader, criterion, device)
-    test_data = next(iter(train_dataloader))
-    test_video = test_data[0]
-    # test_video = rearrange(test_video, 'b p h w c -> b p c h w').cuda()
-    test_video = rearrange(test_video, 'b p h w c -> b p c h w')
-    pred = model(test_video)
-    output = F.log_softmax(pred, dim=1)
-    pred_class = [CLASSES[v.argmax()] for v in output]
-    gt_class = [CLASSES[l] for l in test_data[1]]
-    print('GT classes:')
-    print(gt_class)
-    print('Predicted classes:')
-    print(pred_class)

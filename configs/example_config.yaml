@@ -37,4 +37,7 @@ training:
   checkpoint_save_dir: checkpoints/
   report_to: None  # ["wandb", None]
   balance_dataset: False  # Randomly sample dataset so every class has the same number of instances
-#  weight_decay: 0.0001
+
+evaluation:
+  checkpoint: checkpoints/model.pt
+  dataset_meta_file: example_data_RAVDAI/annotations.json

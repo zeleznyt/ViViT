@@ -1,0 +1,43 @@
+model:
+  patch_size: 16
+  tubelet_size: 1
+  embed_dim: 768
+  spatial_num_heads: 12
+  spatial_num_layers: 12
+  temporal_num_heads: 12
+  temporal_num_layers: 12
+  num_classes: 8
+  max_seq_length: 16
+  image_size: 224
+  use_vit: False  # To use ViT encoder with Conv2d instead of tubelet with Conv3d. ViT is automatically pretrained on Imagenet.
+
+data:
+  batch_size: 2
+  min_sequence_length: 2
+  max_sequence_length: 16
+  frame_sample_rate: 1
+  num_channels: 3
+  height: 224
+  width: 224
+  meta_file: example_data_RAVDAI/annotations.json
+  shuffle: True
+  drop_last: True
+  num_workers: 0  # Higher number not supported yet
+  video_decoder: decord  # ["decord", "pyav"]
+
+training:
+  learning_rate: 0.0025
+  warmup_epochs: 2.5
+  lr_scheduler: cosine  # ["cosine", "constant", "multistep"]
+  optimizer: adam  # ["adam, sgd"]
+  epochs: 50
+  log_step: 50
+  eval_step: 50
+  save_step: 50
+  checkpoint_save_dir: checkpoints/
+  report_to: None  # ["wandb", None]
+  balance_dataset: False  # Randomly sample dataset so every class has the same number of instances
+
+evaluation:
+  checkpoint: checkpoints/model.pt
+  dataset_meta_file: example_data_RAVDAI/annotations.json

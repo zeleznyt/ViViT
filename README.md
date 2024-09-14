@@ -2,13 +2,13 @@
 [Video Vision Transformer](https://arxiv.org/pdf/2103.15691) implementation in pytorch
 
 [//]: # (![ViViT architectures]&#40;assets/vivit_models.png&#41;)
-<p style="text-align: center;">
+<p align="center">
     <img src="assets/vivit_models.png" alt="ViViT architectures">
 </p>
 
 ## Architecture
 Original [Video Vision Transformer](https://arxiv.org/pdf/2103.15691) paper presents 4 different ViViT architectures. This repository implements only the Model2: Factorised Encoder
-<p style="text-align: center;">
+<p align="center">
     <img src="assets/vivit_model2.png" alt="Implemented architecture">
 </p>
 
@@ -16,7 +16,7 @@ Original [Video Vision Transformer](https://arxiv.org/pdf/2103.15691) paper pres
 Original [Video Vision Transformer](https://arxiv.org/pdf/2103.15691) also uses two types of embedding. Uniform and Tubelet.
 This implementation provides option to use both types of embedding. For uniform embedding use `tubelet_size: 1`, `use_vit: True` for Conv2d implementation and `use_vit: False` for Conv3d implementation. See [`configs/example_config.yaml`](configs/example_config.yaml) for details.
 
-<p style="text-align: center;">
+<p align="center">
     <img src="assets/vivit_embedding.png" alt="ViViT embeddings">
 </p>
 

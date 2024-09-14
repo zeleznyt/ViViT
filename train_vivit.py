@@ -176,6 +176,7 @@ def create_balanced_subset(dataset, n_of_instances=-1):
     print('Balanced subset created with {} instances for each class.'.format(n_of_instances))
     return balanced_subset
 
+
 if __name__ == "__main__":
     # Process args and config
     args = parse_args()

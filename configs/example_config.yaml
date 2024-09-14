@@ -9,7 +9,7 @@ model:
   num_classes: 8
   max_seq_length: 16
   image_size: 224
-  use_vit: True  # To use ViT encoder with Conv2d instead of tubelet with Conv3d. ViT is automatically pretrained on Imagenet.
+  use_vit: False  # To use ViT encoder with Conv2d instead of tubelet with Conv3d. ViT is automatically pretrained on Imagenet.
 
 data:
   batch_size: 2
@@ -19,10 +19,10 @@ data:
   num_channels: 3
   height: 224
   width: 224
-  meta_file: /media/zeleznyt/DATA/data/RAVDAI/annotations.json
+  meta_file: /example_data_RAVDAI/annotations.json
   shuffle: True
   drop_last: True
-  num_workers: 0  # Higher number not supported yet because of PyAV
+  num_workers: 0  # Higher number not supported yet
   video_decoder: decord  # ["decord", "pyav"]
 
 training:
@@ -34,7 +34,7 @@ training:
   log_step: 50
   eval_step: 50
   save_step: 50
-  checkpoint_save_dir: /media/zeleznyt/DATA/repo/ViViT/checkpoints
+  checkpoint_save_dir: checkpoints/
   report_to: wandb  # ["wandb", None]
   balance_dataset: False  # Randomly sample dataset so every class has the same number of instances
 #  weight_decay: 0.0001

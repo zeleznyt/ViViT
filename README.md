@@ -47,8 +47,7 @@ python train_vivit.py --config configs/example_config.yaml
 ```
 cd ViViT
 conda activate vivit
-To be added:
-# python eval_vivit.py --config configs/example_config.yaml
+python evaluate_vivit.py --config configs/example_config.yaml
 ```
 
 # Citation

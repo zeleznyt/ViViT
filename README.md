@@ -51,3 +51,17 @@ To be added:
 # python eval_vivit.py --config configs/example_config.yaml
 ```
 
+# Citation
+Citation of original [ViViT paper](https://arxiv.org/pdf/2103.15691).
+```
+@inproceedings{arnab2021vivit,
+  title={Vivit: A video vision transformer},
+  author={Arnab, Anurag and Dehghani, Mostafa and Heigold, Georg and Sun, Chen and Lu{\v{c}}i{\'c}, Mario and Schmid, Cordelia},
+  booktitle={Proceedings of the IEEE/CVF international conference on computer vision},
+  pages={6836--6846},
+  year={2021}
+}
+```
+
+# Acknowledgement
+This implementation was inspired by [@rishikksh20](https://github.com/rishikksh20/) [repository](https://github.com/tristandb8/ViViT-pytorch/tree/develop).

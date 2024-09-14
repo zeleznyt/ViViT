@@ -49,7 +49,6 @@ def evaluate(model, data_loader, loss_func, device):
 
 
 def train_epoch(epoch, model, optimizer, train_data_loader, eval_data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None):
-    # src: https://github.com/tristandb8/ViViT-pytorch/blob/develop/utils.py
     total_samples = len(train_data_loader.dataset)
     model.train()
 

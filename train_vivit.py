@@ -1,23 +1,16 @@
-import argparse
-import av
 import numpy as np
 import torch
-import os
-import json
 from torch import nn
-import torch.nn.functional as F
 from einops import rearrange
 from torch.utils.data import Dataset, DataLoader
 from vivit import ViViT
 from dataset import VideoDataset
-from dataset import visualize_frames
-import yaml
-import wandb
 import time
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import random
 from torch.utils.data import Subset
+from utils import *
 
 np.random.seed(42)
 
@@ -103,31 +96,6 @@ def train_epoch(epoch, model, optimizer, train_data_loader, eval_data_loader, lo
             os.makedirs(checkpoint_save_dir, exist_ok=True)
             torch.save(model.state_dict(), model_path)
             print('Model successfully saved to {}'.format(model_path))
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="Training script for ViViT model")
-
-    # Argument for config file
-    parser.add_argument('--config', type=str, required=True, help='Path to the config file')
-
-    # Parse arguments and return them
-    return parser.parse_args()
-
-
-def load_config(cfg_path):
-    with open(cfg_path, 'r') as file:
-        cfg = yaml.safe_load(file)
-    return cfg
-
-
-def init_wandb(project_name, config):
-    system_config = ['PBS_JOBID']
-    config['system'] = {}
-    for variable in system_config:
-        if variable in os.environ.keys():
-            config['system'][variable] = os.environ[variable]
-    wandb.init(project=project_name, config=config)
 
 
 def dataset_distribution(dataset, plot=False):

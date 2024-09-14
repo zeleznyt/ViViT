@@ -19,7 +19,7 @@ data:
   num_channels: 3
   height: 224
   width: 224
-  meta_file: /example_data_RAVDAI/annotations.json
+  meta_file: example_data_RAVDAI/annotations.json
   shuffle: True
   drop_last: True
   num_workers: 0  # Higher number not supported yet

@@ -35,6 +35,6 @@ training:
   eval_step: 50
   save_step: 50
   checkpoint_save_dir: checkpoints/
-  report_to: wandb  # ["wandb", None]
+  report_to: None  # ["wandb", None]
   balance_dataset: False  # Randomly sample dataset so every class has the same number of instances
 #  weight_decay: 0.0001

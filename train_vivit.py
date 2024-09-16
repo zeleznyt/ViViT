@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
     # dataset_distribution(dataset, True)
 
-    # Set Loss, optimizer and cheduler
+    # Set Loss, optimizer and scheduler
     criterion = nn.CrossEntropyLoss()
     if train_config['optimizer'] == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)

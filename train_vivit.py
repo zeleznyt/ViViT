@@ -71,7 +71,7 @@ def train_epoch(epoch, model, optimizer, train_data_loader, eval_data_loader, lo
 
         end_time = time.time()
 
-        if i % log_step == 0 or i == len(train_data_loader) - 1:
+        if i % log_step == 0:
             # Log to wandb
             if report_to == 'wandb':
                 wandb.log({"train_loss": loss.item(),
@@ -85,16 +85,40 @@ def train_epoch(epoch, model, optimizer, train_data_loader, eval_data_loader, lo
             loss_history.append(loss.item())
             start_time = time.time()
 
-        if (i % eval_step == 0 or i == len(train_data_loader) - 1) and eval_step != -1:
+        if i % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
             eval_loss, acc = evaluate(model, eval_data_loader, loss_func, device)
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')
 
-        if (i % save_step == 0 or i == len(train_data_loader) - 1) and save_step != -1:
-            model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pt'.format(epoch, i))
+        if i % save_step == 0 and save_step != -1:
+            model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
             os.makedirs(checkpoint_save_dir, exist_ok=True)
-            torch.save(model.state_dict(), model_path)
+            checkpoint = {
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': lr_sched.state_dict(),
+                'loss': loss,
+            }
+            torch.save(checkpoint, model_path)
             print('Model successfully saved to {}'.format(model_path))
+
+    print('End of epoch.')
+    print('Evaluation started.')
+    eval_loss, acc = evaluate(model, eval_data_loader, loss_func, device)
+    print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')
+
+    model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
+    os.makedirs(checkpoint_save_dir, exist_ok=True)
+    checkpoint = {
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'scheduler_state_dict': lr_sched.state_dict(),
+        'loss': loss,
+    }
+    torch.save(checkpoint, model_path)
+    print('Model successfully saved to {}'.format(model_path))
 
 
 def dataset_distribution(dataset, plot=False):
@@ -159,8 +183,16 @@ if __name__ == "__main__":
     warmup_epochs = train_config['warmup_epochs']
     learning_rate = train_config['learning_rate']
 
+    model = ViViT(model_config)
+
+    # Load pretrained model
+    if train_config['load_from_checkpoint'] is not None:
+        model.load_state_dict(torch.load(train_config['load_from_checkpoint'], weights_only=False))
+        print(f'Model successfully loaded from {train_config["load_from_checkpoint"]}.')
+
+    # Move model to device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ViViT(model_config).to(device)
+    model = model.to(device)
     # Move non-trainable mask to the device
     model.temporal_transformer.cls_mask = model.temporal_transformer.cls_mask.to(device)
 

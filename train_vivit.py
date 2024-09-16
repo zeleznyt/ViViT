@@ -186,7 +186,7 @@ if __name__ == "__main__":
     model = ViViT(model_config)
 
     # Load pretrained model
-    if train_config['load_from_checkpoint'] is not None:
+    if os.path.exists(train_config['load_from_checkpoint']):
         checkpoint = torch.load('checkpoint.pth')
         model.load_state_dict(torch.load(train_config['load_from_checkpoint'], weights_only=False))
         print(f'Model successfully loaded from {train_config["load_from_checkpoint"]}.')

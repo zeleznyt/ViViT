@@ -12,7 +12,7 @@ import random
 from torch.utils.data import Subset
 from utils import *
 
-np.random.seed(42)
+np.random.seed(0)
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
@@ -185,12 +185,6 @@ if __name__ == "__main__":
 
     model = ViViT(model_config)
 
-    # Load pretrained model
-    if os.path.exists(train_config['load_from_checkpoint']):
-        checkpoint = torch.load('checkpoint.pth')
-        model.load_state_dict(torch.load(train_config['load_from_checkpoint'], weights_only=False))
-        print(f'Model successfully loaded from {train_config["load_from_checkpoint"]}.')
-
     # Move model to device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
@@ -238,6 +232,18 @@ if __name__ == "__main__":
                                     total_iters=int(warmup_epochs * steps_per_epoch))
         lr_sched = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup_scheduler, lr_sched],
                                  milestones=[int(warmup_epochs * steps_per_epoch)])
+
+    # Load pretrained model
+    if os.path.exists(train_config['load_from_checkpoint']):
+        checkpoint = torch.load(train_config['load_from_checkpoint'])
+
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        lr_sched.load_state_dict(checkpoint['scheduler_state_dict'])
+        epoch = checkpoint['epoch']
+        loss = checkpoint['loss']
+
+        print(f'Model successfully loaded from {train_config["load_from_checkpoint"]}.')
 
     train_loss_history, test_loss_history = [], []
 

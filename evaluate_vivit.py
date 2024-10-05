@@ -1,10 +1,10 @@
 import torch
 from torch import nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from vivit import ViViT
 from dataset import VideoDataset
 from train_vivit import evaluate
-from utils import *
+from utils.train_utils import *
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 

@@ -31,6 +31,7 @@ class SpatialTransformer(nn.Module):
         seq_length = (image_size // patch_size) ** 2
         seq_length += 1  # For cls token
         self.pos_embed = nn.Parameter(torch.empty(1, seq_length, embed_dim).normal_(std=0.02))  # from BERT
+        self.norm_layer = nn.LayerNorm(embed_dim)
 
     def forward(self, x):
         b, t, c, h, w = x.shape
@@ -63,6 +64,8 @@ class SpatialTransformer(nn.Module):
         x = x[:, 0]
 
         x = rearrange(x, '(b t) ... -> b t ...', b=b)  # Unflatten batch and temporal dims
+
+        x = self.norm_layer(x)
 
         return x  # Return the class token (batch_size, n_frames, embed_dim)
 
@@ -99,6 +102,7 @@ class TemporalTransformer(nn.Module):
         # self.pos_embed = nn.Parameter(
         #     torch.zeros(1, 100, embed_dim))  # Adjust the 100 according to your max sequence length
         self.pos_embed = nn.Parameter(torch.empty(1, seq_length + 1, embed_dim).normal_(std=0.02))  # from BERT
+        self.norm_layer = nn.LayerNorm(embed_dim)
 
     def forward(self, x, padding_mask=None):
         b, t, n = x.shape
@@ -113,6 +117,7 @@ class TemporalTransformer(nn.Module):
         x += self.pos_embed[:, :t + 1]
 
         x = self.encoder(x, src_key_padding_mask=padding_mask)
+        x = self.norm_layer(x)
 
         return x[:, 0]  # Return the class token (B, E)
 
@@ -139,7 +144,6 @@ class ViViT(nn.Module):
                                                         seq_length=config['max_seq_length'])
         # self.classifier = nn.Linear(embed_dim, num_classes)
         self.classifier = nn.Sequential(
-            nn.LayerNorm(config['embed_dim']),
             nn.Linear(config['embed_dim'], config['num_classes'])
         )
 

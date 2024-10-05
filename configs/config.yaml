@@ -4,8 +4,10 @@ model:
   embed_dim: 768
   spatial_num_heads: 12
   spatial_num_layers: 12
+  spatial_mlp_dim: 2048
   temporal_num_heads: 12
   temporal_num_layers: 12
+  temporal_mlp_dim: 2048
   num_classes: 8
   max_seq_length: 16
   image_size: 224

@@ -10,14 +10,15 @@ torch.manual_seed(0)
 
 
 class SpatialTransformer(nn.Module):
-    def __init__(self, embed_dim=768, num_heads=12, num_layers=12, patch_size=16, tubelet_size=2, image_size=224):  # TODO: get right hyperparameters
+    def __init__(self, embed_dim=768, num_heads=12, dim_feedforward=2048, num_layers=12, patch_size=16, tubelet_size=2, image_size=224):
         super(SpatialTransformer, self).__init__()
 
         self.image_size = image_size
         self.patch_size = patch_size
         self.embed_dim = embed_dim
         self.tubelet_size = tubelet_size
-        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, dim_feedforward=dim_feedforward,
+                                                   batch_first=True)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
         self.conv_proj = nn.Conv3d(
@@ -86,9 +87,10 @@ class ViT(nn.Module):
 
 
 class TemporalTransformer(nn.Module):
-    def __init__(self, embed_dim=768, num_heads=12, num_layers=12, seq_length=16):  # TODO: get right hyperparameters
+    def __init__(self, embed_dim=768, num_heads=12, dim_feedforward=2048, num_layers=12, seq_length=16):
         super(TemporalTransformer, self).__init__()
-        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, dim_feedforward=dim_feedforward,
+                                                   batch_first=True)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
         self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # TODO: randn vs zeros
@@ -125,12 +127,14 @@ class ViViT(nn.Module):
         else:
             self.spatial_transformer = SpatialTransformer(embed_dim=config['embed_dim'],
                                                             num_heads=config['spatial_num_heads'],
+                                                            dim_feedforward=config['spatial_mlp_dim'],
                                                             num_layers=config['spatial_num_layers'],
                                                             patch_size=config['patch_size'],
                                                             tubelet_size=config['tubelet_size'],
                                                             image_size=config['image_size'])
         self.temporal_transformer = TemporalTransformer(embed_dim=config['embed_dim'],
                                                         num_heads=config['temporal_num_heads'],
+                                                        dim_feedforward=config['temporal_mlp_dim'],
                                                         num_layers=config['temporal_num_layers'],
                                                         seq_length=config['max_seq_length'])
         # self.classifier = nn.Linear(embed_dim, num_classes)

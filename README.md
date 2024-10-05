@@ -63,4 +63,4 @@ Citation of original [ViViT paper](https://arxiv.org/pdf/2103.15691).
 ```
 
 # Acknowledgement
-This implementation was inspired by [@rishikksh20](https://github.com/rishikksh20/) [repository](https://github.com/tristandb8/ViViT-pytorch/tree/develop).
+This implementation was inspired by [@rishikksh20](https://github.com/rishikksh20/) [repository](https://github.com/rishikksh20/ViViT-pytorch/tree/develop).

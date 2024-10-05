@@ -8,7 +8,7 @@ model:
   temporal_num_heads: 12
   temporal_num_layers: 12
   temporal_mlp_dim: 3072
-  num_classes: 8
+  num_classes: 400
   max_seq_length: 16
   image_size: 224
   use_vit: False  # To use ViT encoder with Conv2d instead of tubelet with Conv3d. ViT is automatically pretrained on Imagenet.
@@ -37,6 +37,7 @@ training:
   eval_step: 50
   save_step: 50
   checkpoint_save_dir: checkpoints/
+  load_from_checkpoint: checkpoints/vivit_base_factorised_encoder.pt
   report_to: None  # ["wandb", None]
   balance_dataset: False  # Randomly sample dataset so every class has the same number of instances
 

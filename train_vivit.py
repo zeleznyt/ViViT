@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 import random
 from torch.utils.data import Subset
-from utils import *
+from utils.train_utils import *
 
 np.random.seed(0)
 
@@ -238,10 +238,14 @@ if __name__ == "__main__":
         checkpoint = torch.load(train_config['load_from_checkpoint'])
 
         model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        lr_sched.load_state_dict(checkpoint['scheduler_state_dict'])
-        epoch = checkpoint['epoch']
-        loss = checkpoint['loss']
+        if 'optimizer_state_dict' in checkpoint.keys():
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        if 'scheduler_state_dict' in checkpoint.keys():
+            lr_sched.load_state_dict(checkpoint['scheduler_state_dict'])
+        if 'epoch' in checkpoint.keys():
+            epoch = checkpoint['epoch']
+        if 'loss' in checkpoint.keys():
+            loss = checkpoint['loss']
 
         print(f'Model successfully loaded from {train_config["load_from_checkpoint"]}.')
 

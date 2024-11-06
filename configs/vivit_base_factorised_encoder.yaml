@@ -14,7 +14,7 @@ model:
   use_vit: False  # To use ViT encoder with Conv2d instead of tubelet with Conv3d. ViT is automatically pretrained on Imagenet.
 
 data:
-  batch_size: 2
+  batch_size: 1
   min_sequence_length: 2
   max_sequence_length: 16
   frame_sample_rate: 1
@@ -38,7 +38,7 @@ training:
   save_step: 50
   checkpoint_save_dir: checkpoints/
   load_from_checkpoint: checkpoints/vivit_base_factorised_encoder.pt
-  report_to: None  # ["wandb", None]
+  report_to: none  # ["wandb", None]
   balance_dataset: False  # Randomly sample dataset so every class has the same number of instances
 
 evaluation:

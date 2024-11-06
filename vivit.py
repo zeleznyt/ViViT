@@ -119,7 +119,7 @@ class TemporalTransformer(nn.Module):
         x = self.encoder(x, src_key_padding_mask=padding_mask)
         x = self.norm_layer(x)
 
-        return x[:, 0]  # Return the class token (B, E)
+        return x[:, 0]  # Return the class token (batch_size, embed_dim)
 
 
 class ViViT(nn.Module):

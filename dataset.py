@@ -81,6 +81,8 @@ def preprocess_video(video):
 def visualize_frames(video, label=None):
     fig, axes = plt.subplots(4, 4, figsize=(8, 8))
     for i, ax in enumerate(axes.flat):
+        if i >= len(video):
+            break
         ax.imshow(video[i])  # Display image
         ax.axis('off')
     if label is not None:
@@ -93,6 +95,14 @@ def debug_indicies(video_path, indicies):
     decord_vr = decord.VideoReader(video_path, num_threads=1)
     video = list(decord_vr.get_batch(indicies).asnumpy())
     visualize_frames(video)
+
+
+def get_label_on_idx(frame_idx, annotation_list):
+    for annotation in annotation_list:
+        if annotation[0] <= frame_idx <= annotation[1]:
+            return annotation[2]
+    else:
+        return -1
 
 
 class VideoDataset(Dataset):
@@ -186,3 +196,72 @@ class VideoDataset(Dataset):
         y = self.data[index][2]
 
         return x, y, np.array(padding_mask)
+
+
+class VideoStreamDataset(VideoDataset):
+    def __init__(self, meta_file, classes, frame_sample_rate=1, context_size=8, overlap=2, max_empty_frames=3,
+                 input_fps=25, step=1000, video_decoder='decord'):
+        """
+        Args:
+            meta_file (`str`): Path to the metafile containing paths to video and annotation files
+            classes (`list`): List of classes
+            frame_sample_rate (`float`): Frame sampling per second. (5 for processing frame each 5th second)
+                                         If not result frame index not int, the number is floored (mainly for rate < 1)
+            context_size (`int`): Size of window (data) is 2 x context_size + 1 (center). 17 by default
+            overlap (`int`): Overlap of sliding window while creating the dataset
+            max_empty_frames (`int`): Maximum number of frames in a sequence that are not labeled with any class. -1 for unlimited
+            input_fps (`int`): Frame sampling of input video
+            step (`int`): Number of annotation time steps in one second (1000 for milliseconds)
+        """
+
+        self.meta_file = meta_file
+        self.classes = classes
+        self.data = []
+        self.frame_sample_rate = frame_sample_rate
+        self.context_size = context_size
+        self.overlap = overlap
+        self.max_empty_frames = max_empty_frames
+        if self.max_empty_frames == -1:
+            self.max_empty_frames = 9999
+        self.input_fps = input_fps
+        self.video_decoder = video_decoder
+        self.step = step
+        self.max_sequence_length = 2 * context_size + 1
+        sampling = self.input_fps * self.frame_sample_rate
+
+        with open(self.meta_file, 'r') as f:
+            self.meta_data = json.load(f)
+
+        self.video_handler = {}
+
+        for annotation_file in self.meta_data:
+            video_path = annotation_file['video']
+            if video_path not in self.video_handler.keys():
+                if self.video_decoder == 'pyav':
+                    self.video_handler[video_path] = av.open(video_path)
+                elif self.video_decoder == 'decord':
+                    self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
+                else:
+                    print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+
+            annotation_list = get_eaf(annotation_file['annotation'])
+
+            mid_frame = self.context_size * sampling
+
+            while (mid_frame + self.context_size * sampling) / self.input_fps * self.step <= annotation_list[-1][1]:
+                indexes = list(np.arange(mid_frame - (self.context_size * sampling),
+                                     mid_frame + ((self.context_size +1) * sampling),
+                                     sampling).astype(int))
+                labels = [get_label_on_idx(i / self.input_fps * self.step, annotation_list) for i in indexes]
+                label = labels[self.context_size]
+                # label = get_label_on_idx(indexes[self.context_size] / self.input_fps * self.step, annotation_list)
+                if label == -1 or labels.count(-1) > self.max_empty_frames:
+                    mid_frame += (self.context_size * 2 + 1 - self.overlap) * sampling
+                    continue
+
+                if label not in self.classes:
+                    mid_frame += (self.context_size * 2 + 1 - self.overlap) * sampling
+                    continue
+
+                self.data.append([annotation_file['video'], indexes, self.classes.index(label)])
+                mid_frame += (self.context_size * 2 + 1 - self.overlap) * sampling

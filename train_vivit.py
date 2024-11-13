@@ -4,7 +4,7 @@ from torch import nn
 from einops import rearrange
 from torch.utils.data import Dataset, DataLoader
 from vivit import ViViT
-from dataset import VideoDataset
+from dataset import VideoDataset, VideoStreamDataset
 import time
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -84,6 +84,9 @@ def train_epoch(epoch, model, optimizer, train_data_loader, eval_data_loader, lo
                   '{:6.4f}'.format(loss.item()))
             loss_history.append(loss.item())
             start_time = time.time()
+
+        if i == 0:
+            continue
 
         if i % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
@@ -192,16 +195,20 @@ if __name__ == "__main__":
     model.temporal_transformer.cls_mask = model.temporal_transformer.cls_mask.to(device)
 
     # Create dataset
+    start = time.time()
     print('Loading dataset...')
-    dataset = VideoDataset(data_config['meta_file'], CLASSES, frame_sample_rate=data_config['frame_sample_rate'],
-                           min_sequence_length=data_config['min_sequence_length'],
-                           max_sequence_length=data_config['max_sequence_length'],
-                           video_decoder=data_config['video_decoder'],)
+    # dataset = VideoDataset(data_config['meta_file'], CLASSES, frame_sample_rate=data_config['frame_sample_rate'],
+    #                        min_sequence_length=data_config['min_sequence_length'],
+    #                        max_sequence_length=data_config['max_sequence_length'],
+    #                        video_decoder=data_config['video_decoder'],)
+    dataset2 = VideoStreamDataset(data_config['meta_file'], CLASSES)
+
     if train_config['balance_dataset']:
         dataset = create_balanced_subset(dataset)
-    train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
+    train_dataloader = DataLoader(dataset2, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
-    print('Dataset successfully loaded.')
+    end = time.time()
+    print(f'Dataset successfully loaded in {end - start} seconds.')
 
     # dataset_distribution(dataset, True)
 

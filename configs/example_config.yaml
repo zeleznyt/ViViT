@@ -38,6 +38,7 @@ training:
   save_step: 50
   checkpoint_save_dir: checkpoints/
   load_from_checkpoint: none
+  load_only_weights: False
   report_to: none  # ["wandb", None]
   balance_dataset: False  # Randomly sample dataset so every class has the same number of instances
 

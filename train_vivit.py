@@ -207,6 +207,7 @@ if __name__ == "__main__":
         dataset = create_balanced_subset(dataset)
     train_dataloader = DataLoader(dataset2, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
+    dataset_distribution(dataset2, True)
     end = time.time()
     print(f'Dataset successfully loaded in {end - start} seconds.')
 
@@ -245,14 +246,15 @@ if __name__ == "__main__":
         checkpoint = torch.load(train_config['load_from_checkpoint'])
 
         model.load_state_dict(checkpoint['model_state_dict'])
-        if 'optimizer_state_dict' in checkpoint.keys():
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        if 'scheduler_state_dict' in checkpoint.keys():
-            lr_sched.load_state_dict(checkpoint['scheduler_state_dict'])
-        if 'epoch' in checkpoint.keys():
-            epoch = checkpoint['epoch']
-        if 'loss' in checkpoint.keys():
-            loss = checkpoint['loss']
+        if not train_config['load_only_weights']:
+            if 'optimizer_state_dict' in checkpoint.keys():
+                optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            if 'scheduler_state_dict' in checkpoint.keys():
+                lr_sched.load_state_dict(checkpoint['scheduler_state_dict'])
+            if 'epoch' in checkpoint.keys():
+                epoch = checkpoint['epoch']
+            if 'loss' in checkpoint.keys():
+                loss = checkpoint['loss']
 
         print(f'Model successfully loaded from {train_config["load_from_checkpoint"]}.')
 

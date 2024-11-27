@@ -197,17 +197,25 @@ if __name__ == "__main__":
     # Create dataset
     start = time.time()
     print('Loading dataset...')
-    # dataset = VideoDataset(data_config['meta_file'], CLASSES, frame_sample_rate=data_config['frame_sample_rate'],
-    #                        min_sequence_length=data_config['min_sequence_length'],
-    #                        max_sequence_length=data_config['max_sequence_length'],
-    #                        video_decoder=data_config['video_decoder'],)
-    dataset2 = VideoStreamDataset(data_config['meta_file'], CLASSES)
+    assert data_config['dataset_type'] in ['one_class', 'stream'], f'Dataset type {data_config["dataset_type"]} not supported'
+    if data_config['dataset_type'] == 'one_class':
+        dataset = VideoDataset(data_config['meta_file'], CLASSES,
+                               frame_sample_rate=data_config['frame_sample_rate'],
+                               min_sequence_length=data_config['min_sequence_length'],
+                               max_sequence_length=data_config['max_sequence_length'],
+                               video_decoder=data_config['video_decoder'],)
+    elif data_config['dataset_type'] == 'stream':
+        dataset = VideoStreamDataset(data_config['meta_file'], CLASSES,
+                                     frame_sample_rate=data_config['frame_sample_rate'],
+                                     context_size=data_config['context_size'],
+                                     overlap=data_config['context_size'],
+                                     max_empty_frames=data_config['max_empty_frames'],
+                                     video_decoder=data_config['video_decoder'],)
 
     if train_config['balance_dataset']:
         dataset = create_balanced_subset(dataset)
-    train_dataloader = DataLoader(dataset2, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
+    train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
-    dataset_distribution(dataset2, True)
     end = time.time()
     print(f'Dataset successfully loaded in {end - start} seconds.')
 

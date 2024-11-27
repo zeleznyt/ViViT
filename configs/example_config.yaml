@@ -14,9 +14,12 @@ model:
   use_vit: False  # To use ViT encoder with Conv2d instead of tubelet with Conv3d. ViT is automatically pretrained on Imagenet.
 
 data:
-  batch_size: 2
-  min_sequence_length: 2
-  max_sequence_length: 16
+  dataset_type: stream  # [one_class, stream]
+  min_sequence_length: 2  # for one_class only
+  max_sequence_length: 16  # for one_class only
+  context_size: 8  # for stream only
+  overlap: 2  # for stream only
+  max_empty_frames: 3  # for stream only
   frame_sample_rate: 1
   num_channels: 3
   height: 224
@@ -24,6 +27,7 @@ data:
   meta_file: example_data_RAVDAI/annotations.json
   shuffle: True
   drop_last: True
+  batch_size: 2
   num_workers: 0  # Higher number not supported yet
   video_decoder: decord  # ["decord", "pyav"]
 

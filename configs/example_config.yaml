@@ -25,6 +25,9 @@ data:
   height: 224
   width: 224
   meta_file: example_data_RAVDAI/annotations.json
+  train_json: none
+  val_json: none
+  test_json: none
   shuffle: True
   drop_last: True
   batch_size: 2

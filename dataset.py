@@ -106,8 +106,8 @@ def get_label_on_idx(frame_idx, annotation_list):
 
 
 class VideoDataset(Dataset):
-    def __init__(self, meta_file, classes, frame_sample_rate=1, min_sequence_length=2, max_sequence_length=16,
-                 input_fps=25, step=1000, video_decoder='decord'):
+    def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, min_sequence_length=2,
+                 max_sequence_length=16, input_fps=25, step=1000, video_decoder='decord'):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -135,36 +135,49 @@ class VideoDataset(Dataset):
 
         self.video_handler = {}
 
-        for annotation_file in self.meta_data:
-            video_path = annotation_file['video']
-            if video_path not in self.video_handler.keys():
-                if self.video_decoder == 'pyav':
-                    self.video_handler[video_path] = av.open(video_path)
-                elif self.video_decoder == 'decord':
-                    self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-                else:
-                    print('Unknown video decoder. Must be one of ["pyav", "decord"]')
-
-            annotation_list = get_eaf(annotation_file['annotation'])
-
-            for annotation in annotation_list:
-                if annotation[2] not in self.classes:
-                    continue
-
-                start_frame = int(annotation[0] / self.step * self.input_fps)
-                end_frame = int(annotation[1] / self.step * self.input_fps)
-                for i in range(int(np.ceil((end_frame - start_frame) /
-                                           (self.max_sequence_length * self.input_fps * self.frame_sample_rate)))):
-                    indexes = list(np.arange(start_frame + i * self.max_sequence_length * sampling,
-                                             start_frame + (i + 1) * self.max_sequence_length * sampling,
-                                             sampling).astype(int))
-                    if indexes[-1] <= end_frame and len(indexes) >= self.min_sequence_length:
-                        self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
+        if load_from_json is not None and os.path.exists(load_from_json):
+            with open(load_from_json, 'r') as f:
+                self.data = json.load(f)
+            for item in self.data:
+                video_path = item[0]
+                if video_path not in self.video_handler.keys():
+                    if self.video_decoder == 'pyav':
+                        self.video_handler[video_path] = av.open(video_path)
+                    elif self.video_decoder == 'decord':
+                        self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
                     else:
-                        last_len = (end_frame - start_frame) % (self.max_sequence_length * sampling)
-                        indexes = list(np.arange(end_frame - last_len, end_frame, sampling).astype(int))
-                        if len(indexes) >= self.min_sequence_length:
+                        print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+        else:
+            for annotation_file in self.meta_data:
+                video_path = annotation_file['video']
+                if video_path not in self.video_handler.keys():
+                    if self.video_decoder == 'pyav':
+                        self.video_handler[video_path] = av.open(video_path)
+                    elif self.video_decoder == 'decord':
+                        self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
+                    else:
+                        print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+
+                annotation_list = get_eaf(annotation_file['annotation'])
+
+                for annotation in annotation_list:
+                    if annotation[2] not in self.classes:
+                        continue
+
+                    start_frame = int(annotation[0] / self.step * self.input_fps)
+                    end_frame = int(annotation[1] / self.step * self.input_fps)
+                    for i in range(int(np.ceil((end_frame - start_frame) /
+                                               (self.max_sequence_length * self.input_fps * self.frame_sample_rate)))):
+                        indexes = list(np.arange(start_frame + i * self.max_sequence_length * sampling,
+                                                 start_frame + (i + 1) * self.max_sequence_length * sampling,
+                                                 sampling).astype(int))
+                        if indexes[-1] <= end_frame and len(indexes) >= self.min_sequence_length:
                             self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
+                        else:
+                            last_len = (end_frame - start_frame) % (self.max_sequence_length * sampling)
+                            indexes = list(np.arange(end_frame - last_len, end_frame, sampling).astype(int))
+                            if len(indexes) >= self.min_sequence_length:
+                                self.data.append([annotation_file['video'], indexes, self.classes.index(annotation[2])])
 
     def __len__(self):
         return len(self.data)
@@ -199,8 +212,8 @@ class VideoDataset(Dataset):
 
 
 class VideoStreamDataset(VideoDataset):
-    def __init__(self, meta_file, classes, frame_sample_rate=1, context_size=8, overlap=2, max_empty_frames=3,
-                 input_fps=25, step=1000, video_decoder='decord'):
+    def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, context_size=8, overlap=2,
+                 max_empty_frames=3, input_fps=25, step=1000, video_decoder='decord'):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -234,34 +247,47 @@ class VideoStreamDataset(VideoDataset):
 
         self.video_handler = {}
 
-        for annotation_file in self.meta_data:
-            video_path = annotation_file['video']
-            if video_path not in self.video_handler.keys():
-                if self.video_decoder == 'pyav':
-                    self.video_handler[video_path] = av.open(video_path)
-                elif self.video_decoder == 'decord':
-                    self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-                else:
-                    print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+        if load_from_json is not None and os.path.exists(load_from_json):
+            with open(load_from_json, 'r') as f:
+                self.data = json.load(f)
+            for item in self.data:
+                video_path = item[0]
+                if video_path not in self.video_handler.keys():
+                    if self.video_decoder == 'pyav':
+                        self.video_handler[video_path] = av.open(video_path)
+                    elif self.video_decoder == 'decord':
+                        self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
+                    else:
+                        print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+        else:
+            for annotation_file in self.meta_data:
+                video_path = annotation_file['video']
+                if video_path not in self.video_handler.keys():
+                    if self.video_decoder == 'pyav':
+                        self.video_handler[video_path] = av.open(video_path)
+                    elif self.video_decoder == 'decord':
+                        self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
+                    else:
+                        print('Unknown video decoder. Must be one of ["pyav", "decord"]')
 
-            annotation_list = get_eaf(annotation_file['annotation'])
+                annotation_list = get_eaf(annotation_file['annotation'])
 
-            mid_frame = self.context_size * sampling
+                mid_frame = self.context_size * sampling
 
-            while (mid_frame + self.context_size * sampling) / self.input_fps * self.step <= annotation_list[-1][1]:
-                indexes = list(np.arange(mid_frame - (self.context_size * sampling),
-                                     mid_frame + ((self.context_size +1) * sampling),
-                                     sampling).astype(int))
-                labels = [get_label_on_idx(i / self.input_fps * self.step, annotation_list) for i in indexes]
-                label = labels[self.context_size]
-                # label = get_label_on_idx(indexes[self.context_size] / self.input_fps * self.step, annotation_list)
-                if label == -1 or labels.count(-1) > self.max_empty_frames:
+                while (mid_frame + self.context_size * sampling) / self.input_fps * self.step <= annotation_list[-1][1]:
+                    indexes = list(np.arange(mid_frame - (self.context_size * sampling),
+                                         mid_frame + ((self.context_size +1) * sampling),
+                                         sampling).astype(int))
+                    labels = [get_label_on_idx(i / self.input_fps * self.step, annotation_list) for i in indexes]
+                    label = labels[self.context_size]
+                    # label = get_label_on_idx(indexes[self.context_size] / self.input_fps * self.step, annotation_list)
+                    if label == -1 or labels.count(-1) > self.max_empty_frames:
+                        mid_frame += (self.context_size * 2 + 1 - self.overlap) * sampling
+                        continue
+
+                    if label not in self.classes:
+                        mid_frame += (self.context_size * 2 + 1 - self.overlap) * sampling
+                        continue
+
+                    self.data.append([annotation_file['video'], indexes, self.classes.index(label)])
                     mid_frame += (self.context_size * 2 + 1 - self.overlap) * sampling
-                    continue
-
-                if label not in self.classes:
-                    mid_frame += (self.context_size * 2 + 1 - self.overlap) * sampling
-                    continue
-
-                self.data.append([annotation_file['video'], indexes, self.classes.index(label)])
-                mid_frame += (self.context_size * 2 + 1 - self.overlap) * sampling

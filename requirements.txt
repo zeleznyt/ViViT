@@ -8,3 +8,4 @@ matplotlib
 einops
 pyyaml
 wandb
+scikit-learn

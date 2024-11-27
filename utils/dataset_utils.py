@@ -30,7 +30,8 @@ def stratified_split(dataset, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15, 
         train_dataset, val_dataset, test_dataset: Subsets of the original dataset.
     """
     assert train_ratio + val_ratio + test_ratio == 1, "Ratios must sum to 1."
-    targets = [i[2] for i in dataset] # Get class labels
+    original_data = dataset.data
+    targets = [i[2] for i in original_data] # Get class labels
 
     train_idx, remaining_idx = train_test_split(
         range(len(targets)),
@@ -62,19 +63,22 @@ def create_split(original_dataset, output_path='dataset_split', dataset_name='Vi
     print(f'Indexes created')
     os.makedirs(output_path, exist_ok=True)
 
-    train_data = [convert_to_serializable(item) for item in train_dataset.dataset.data]
+    train_data = [original_dataset.data[i] for i in train_dataset.indices]
+    train_data = [convert_to_serializable(item) for item in train_data]
     with open(os.path.join(output_path, dataset_name+'.train.json'), 'w') as ftr:
         json.dump(train_data, ftr)
     print(f"Train data saved to {os.path.join(output_path, dataset_name+'.train.json')}")
 
 
-    val_data = [convert_to_serializable(item) for item in val_dataset.dataset.data]
+    val_data = [original_dataset.data[i] for i in val_dataset.indices]
+    val_data = [convert_to_serializable(item) for item in val_data]
     with open(os.path.join(output_path, dataset_name+'.val.json'), 'w') as fva:
         json.dump(val_data, fva)
     print(f"Validation data saved to {os.path.join(output_path, dataset_name+'.val.json')}")
 
 
-    test_data = [convert_to_serializable(item) for item in test_dataset.dataset.data]
+    test_data = [original_dataset.data[i] for i in test_dataset.indices]
+    test_data = [convert_to_serializable(item) for item in test_data]
     with open(os.path.join(output_path, dataset_name+'.test.json'), 'w') as fte:
         json.dump(test_data, fte)
     print(f"Test data saved to {os.path.join(output_path, dataset_name+'.test.json')}")

@@ -199,15 +199,28 @@ if __name__ == "__main__":
     print('Loading dataset...')
     assert data_config['dataset_type'] in ['one_class', 'stream'], f'Dataset type {data_config["dataset_type"]} not supported'
     if data_config['dataset_type'] == 'one_class':
-        dataset = VideoDataset(data_config['meta_file'], CLASSES,
+        train_dataset = VideoDataset(data_config['meta_file'], CLASSES,
                                load_from_json=data_config['train_json'],
                                frame_sample_rate=data_config['frame_sample_rate'],
                                min_sequence_length=data_config['min_sequence_length'],
                                max_sequence_length=data_config['max_sequence_length'],
                                video_decoder=data_config['video_decoder'],)
+        val_dataset = VideoDataset(data_config['meta_file'], CLASSES,
+                               load_from_json=data_config['val_json'],
+                               frame_sample_rate=data_config['frame_sample_rate'],
+                               min_sequence_length=data_config['min_sequence_length'],
+                               max_sequence_length=data_config['max_sequence_length'],
+                               video_decoder=data_config['video_decoder'],)
     elif data_config['dataset_type'] == 'stream':
-        dataset = VideoStreamDataset(data_config['meta_file'], CLASSES,
+        train_dataset = VideoStreamDataset(data_config['meta_file'], CLASSES,
                                      load_from_json=data_config['train_json'],
+                                     frame_sample_rate=data_config['frame_sample_rate'],
+                                     context_size=data_config['context_size'],
+                                     overlap=data_config['context_size'],
+                                     max_empty_frames=data_config['max_empty_frames'],
+                                     video_decoder=data_config['video_decoder'],)
+        val_dataset = VideoStreamDataset(data_config['meta_file'], CLASSES,
+                                     load_from_json=data_config['val_json'],
                                      frame_sample_rate=data_config['frame_sample_rate'],
                                      context_size=data_config['context_size'],
                                      overlap=data_config['context_size'],
@@ -215,13 +228,13 @@ if __name__ == "__main__":
                                      video_decoder=data_config['video_decoder'],)
 
     if train_config['balance_dataset']:
-        dataset = create_balanced_subset(dataset)
-    train_dataloader = DataLoader(dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
+        train_dataset = create_balanced_subset(train_dataset)
+    train_dataloader = DataLoader(train_dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
+                                  drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
+    val_dataloader = DataLoader(val_dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     end = time.time()
-    print(f'Dataset with length {len(dataset)} successfully loaded in {end - start} seconds.')
-
-    # dataset_distribution(dataset, True)
+    print(f'Dataset successfully loaded in {end - start} seconds.')
 
     # Set Loss, optimizer and scheduler
     criterion = nn.CrossEntropyLoss()
@@ -280,7 +293,7 @@ if __name__ == "__main__":
         print('Epoch:', epoch)
         train_epoch(epoch, model, optimizer,
                     train_data_loader=train_dataloader,
-                    eval_data_loader=train_dataloader,
+                    eval_data_loader=val_dataloader,
                     loss_history=train_loss_history,
                     loss_func=criterion,
                     device=device,

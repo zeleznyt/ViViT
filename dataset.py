@@ -130,12 +130,19 @@ class VideoDataset(Dataset):
         self.step = step
         sampling = self.input_fps * self.frame_sample_rate
 
+        video_list = []
+        self.meta_data = []
         with open(self.meta_file, 'r') as f:
-            self.meta_data = json.load(f)
+            meta_data = json.load(f)
+            for i, video in enumerate(meta_data):
+                if video['video'] not in video_list:
+                    video_list.append(video['video'])
+                    self.meta_data.append(meta_data[i])
 
         self.video_handler = {}
 
         if load_from_json is not None and os.path.exists(load_from_json):
+            print(f'Loading data from {load_from_json}')
             with open(load_from_json, 'r') as f:
                 self.data = json.load(f)
             for item in self.data:
@@ -242,12 +249,19 @@ class VideoStreamDataset(VideoDataset):
         self.max_sequence_length = 2 * context_size + 1
         sampling = self.input_fps * self.frame_sample_rate
 
+        video_list = []
+        self.meta_data = []
         with open(self.meta_file, 'r') as f:
-            self.meta_data = json.load(f)
+            meta_data = json.load(f)
+            for i, video in enumerate(meta_data):
+                if video['video'] not in video_list:
+                    video_list.append(video['video'])
+                    self.meta_data.append(meta_data[i])
 
         self.video_handler = {}
 
         if load_from_json is not None and os.path.exists(load_from_json):
+            print(f'Loading data from {load_from_json}')
             with open(load_from_json, 'r') as f:
                 self.data = json.load(f)
             for item in self.data:

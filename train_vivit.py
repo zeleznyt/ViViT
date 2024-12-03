@@ -11,6 +11,7 @@ from collections import defaultdict
 import random
 from torch.utils.data import Subset
 from utils.train_utils import *
+from tqdm import tqdm
 
 np.random.seed(0)
 
@@ -23,7 +24,7 @@ def evaluate(model, data_loader, loss_func, device):
     correct_predictions = 0
     total_predictions = 0
     with torch.no_grad():
-        for i, (data, target, padding_mask) in enumerate(data_loader):
+        for i, (data, target, padding_mask) in tqdm(enumerate(data_loader)):
             # Use this to visualize th data
             # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
             optimizer.zero_grad()
@@ -48,7 +49,7 @@ def evaluate(model, data_loader, loss_func, device):
     return loss, accuracy
 
 
-def train_epoch(epoch, model, optimizer, train_data_loader, eval_data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None):
+def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None):
     total_samples = len(train_data_loader.dataset)
     model.train()
 
@@ -71,27 +72,32 @@ def train_epoch(epoch, model, optimizer, train_data_loader, eval_data_loader, lo
 
         end_time = time.time()
 
-        if i % log_step == 0:
-            # Log to wandb
-            if report_to == 'wandb':
-                wandb.log({"train_loss": loss.item(),
-                           "time_per_iteration": (end_time - start_time) / log_step,
-                           "epoch": epoch,
-                           "learning_rate": optimizer.param_groups[0]['lr']})
-
-            print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
-                  ' (' + '{:3.0f}'.format(100 * i / len(train_data_loader)) + '%)]  Loss: ' +
-                  '{:6.4f}'.format(loss.item()))
-            loss_history.append(loss.item())
-            start_time = time.time()
-
         if i == 0:
             continue
 
         if i % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
             eval_loss, acc = evaluate(model, eval_data_loader, loss_func, device)
+            wandb.log({"eval/loss": eval_loss,
+                       "eval/accuracy": acc},
+                      step=lr_sched.last_epoch, commit=False)
+
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')
+
+        if i % log_step == 0:
+            # Log to wandb
+            if report_to == 'wandb':
+                wandb.log({"train/loss": loss.item(),
+                           "train/time_per_iteration": (end_time - start_time) / log_step,
+                           "train/epoch": epoch,
+                           "train/learning_rate": optimizer.param_groups[0]['lr']},
+                          step=lr_sched.last_epoch, commit=True)
+
+            print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
+                  ' (' + '{:3.0f}'.format(100 * i / len(train_data_loader)) + '%)]  Loss: ' +
+                  '{:6.4f}'.format(loss.item()))
+            loss_history.append(loss.item())
+            start_time = time.time()
 
         if i % save_step == 0 and save_step != -1:
             model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
@@ -264,6 +270,7 @@ if __name__ == "__main__":
         lr_sched = torch.optim.lr_scheduler.SequentialLR(optimizer, schedulers=[warmup_scheduler, lr_sched],
                                  milestones=[int(warmup_epochs * steps_per_epoch)])
 
+    start_epoch = 0
     # Load pretrained model
     if os.path.exists(train_config['load_from_checkpoint']):
         checkpoint = torch.load(train_config['load_from_checkpoint'])
@@ -275,7 +282,7 @@ if __name__ == "__main__":
             if 'scheduler_state_dict' in checkpoint.keys():
                 lr_sched.load_state_dict(checkpoint['scheduler_state_dict'])
             if 'epoch' in checkpoint.keys():
-                epoch = checkpoint['epoch']
+                start_epoch = checkpoint['epoch']
             if 'loss' in checkpoint.keys():
                 loss = checkpoint['loss']
 
@@ -289,15 +296,17 @@ if __name__ == "__main__":
     if train_config['report_to'] == 'wandb':
         init_wandb(project_name, config)
 
-    for epoch in range(num_epochs):
+    for e in range(num_epochs):
+        epoch = start_epoch + e
         print('Epoch:', epoch)
-        train_epoch(epoch, model, optimizer,
+        train_epoch(epoch, model, optimizer, lr_sched,
                     train_data_loader=train_dataloader,
                     eval_data_loader=val_dataloader,
                     loss_history=train_loss_history,
                     loss_func=criterion,
                     device=device,
-                    log_step=train_config['log_step'], eval_step=train_config['eval_step'],
+                    log_step=train_config['log_step'],
+                    eval_step=train_config['eval_step'],
                     save_step=train_config['save_step'],
                     checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name),
                     report_to=train_config['report_to'])

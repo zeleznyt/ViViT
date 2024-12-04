@@ -24,7 +24,7 @@ def evaluate(model, data_loader, loss_func, device):
     correct_predictions = 0
     total_predictions = 0
     with torch.no_grad():
-        for i, (data, target, padding_mask) in tqdm(enumerate(data_loader)):
+        for i, (data, target, padding_mask) in tqdm(enumerate(data_loader), total=len(data_loader)):
             # Use this to visualize th data
             # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
             optimizer.zero_grad()

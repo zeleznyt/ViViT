@@ -239,7 +239,7 @@ if __name__ == "__main__":
     val_dataloader = DataLoader(val_dataset, batch_size=data_config['batch_size'], shuffle=False,
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     end = time.time()
-    print(f'Dataset successfully loaded in {end - start} seconds.')
+    print('Dataset "{}" successfully loaded in {} seconds.'.format(data_config['dataset_type'], end - start))
 
     # Set Loss, optimizer and scheduler
     criterion = nn.CrossEntropyLoss()

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from vivit import ViViT
-from dataset import VideoDataset
+from dataset import VideoDataset, VideoStreamDataset
 from train_vivit import evaluate
 from utils.train_utils import *
 
@@ -33,14 +33,25 @@ if __name__ == "__main__":
     checkpoint = torch.load(eval_config['checkpoint'], weights_only=True)
     model.load_state_dict(checkpoint['model_state_dict'])
     print('Loading dataset...')
-    val_dataset = VideoDataset(eval_config['dataset_meta_file'], CLASSES,
+    assert data_config['dataset_type'] in ['one_class', 'stream'], f'Dataset type {data_config["dataset_type"]} not supported'
+    if data_config['dataset_type'] == 'one_class':
+        val_dataset = VideoDataset(data_config['meta_file'], CLASSES,
+                               load_from_json=data_config['val_json'],
                                frame_sample_rate=data_config['frame_sample_rate'],
                                min_sequence_length=data_config['min_sequence_length'],
                                max_sequence_length=data_config['max_sequence_length'],
                                video_decoder=data_config['video_decoder'],)
+    elif data_config['dataset_type'] == 'stream':
+        val_dataset = VideoStreamDataset(data_config['meta_file'], CLASSES,
+                                     load_from_json=data_config['val_json'],
+                                     frame_sample_rate=data_config['frame_sample_rate'],
+                                     context_size=data_config['context_size'],
+                                     overlap=data_config['context_size'],
+                                     max_empty_frames=data_config['max_empty_frames'],
+                                     video_decoder=data_config['video_decoder'],)
     val_dataloader = DataLoader(val_dataset, batch_size=data_config['batch_size'], shuffle=False,
                                 drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
-    print('Dataset successfully loaded.')
+    print('Dataset "{}" successfully loaded.'.format(data_config['dataset_type']))
 
     loss_func = nn.CrossEntropyLoss()
 

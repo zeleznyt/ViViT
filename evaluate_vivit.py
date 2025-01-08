@@ -16,14 +16,10 @@ if __name__ == "__main__":
 
     model_config = config['model']
     data_config = config['data']
-    train_config = config['training']
     eval_config = config['evaluation']
 
     num_classes = len(CLASSES)
     model_config['num_classes'] = num_classes
-    num_epochs = train_config['epochs']
-    warmup_epochs = train_config['warmup_epochs']
-    learning_rate = train_config['learning_rate']
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ViViT(model_config).to(device)

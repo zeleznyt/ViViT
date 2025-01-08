@@ -30,14 +30,15 @@ if __name__ == "__main__":
     # Move non-trainable mask to the device
     model.temporal_transformer.cls_mask = model.temporal_transformer.cls_mask.to(device)
 
-    model.load_state_dict(torch.load(eval_config['checkpoint']))
+    checkpoint = torch.load(eval_config['checkpoint'], weights_only=True)
+    model.load_state_dict(checkpoint['model_state_dict'])
     print('Loading dataset...')
     val_dataset = VideoDataset(eval_config['dataset_meta_file'], CLASSES,
                                frame_sample_rate=data_config['frame_sample_rate'],
                                min_sequence_length=data_config['min_sequence_length'],
                                max_sequence_length=data_config['max_sequence_length'],
                                video_decoder=data_config['video_decoder'],)
-    val_dataloader = DataLoader(val_dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
+    val_dataloader = DataLoader(val_dataset, batch_size=data_config['batch_size'], shuffle=False,
                                 drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     print('Dataset successfully loaded.')
 

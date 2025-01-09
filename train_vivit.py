@@ -291,7 +291,7 @@ if __name__ == "__main__":
     train_loss_history, test_loss_history = [], []
 
     model_name = 'ViVit-B_{}x{}-{}'.format(model_config['patch_size'], model_config['tubelet_size'],
-                                           datetime.now().strftime('%Y-%m-%dT%H-%M'))
+                                           datetime.now().strftime('%Y-%m-%dT%H-%M-%S'))
 
     project_name = 'ViViT'
     if train_config['report_to'] == 'wandb':

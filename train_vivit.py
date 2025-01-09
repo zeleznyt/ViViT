@@ -12,6 +12,7 @@ import random
 from torch.utils.data import Subset
 from utils.train_utils import *
 from tqdm import tqdm
+from datetime import datetime
 
 np.random.seed(0)
 
@@ -289,11 +290,12 @@ if __name__ == "__main__":
 
     train_loss_history, test_loss_history = [], []
 
-    model_name = 'ViVit-B_{}x{}'.format(model_config['patch_size'], model_config['tubelet_size'])
+    model_name = 'ViVit-B_{}x{}-{}'.format(model_config['patch_size'], model_config['tubelet_size'],
+                                           datetime.now().strftime('%Y-%m-%dT%H-%M'))
 
     project_name = 'ViViT'
     if train_config['report_to'] == 'wandb':
-        init_wandb(project_name, config)
+        init_wandb(project_name, config, name=model_name)
 
     for e in range(num_epochs):
         epoch = start_epoch + e

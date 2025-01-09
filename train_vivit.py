@@ -19,6 +19,20 @@ np.random.seed(0)
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
 
+def target_to_string(target):
+    # Transform to list
+    if isinstance(target, torch.Tensor) or isinstance(target, np.ndarray):
+        target = target.tolist()
+    elif not isinstance(target, list):
+        raise TypeError("Unsupported type. Target must be a tensor, numpy array, or list.")
+
+    # Check if target contains valid indices
+    if not all(isinstance(idx, int) and 0 <= idx < len(CLASSES) for idx in target):
+        raise ValueError("All elements in the target must be valid indices in the CLASSES array.")
+
+    return [CLASSES[idx] for idx in target]
+
+
 def evaluate(model, data_loader, loss_func, device):
     model.eval()
     loss = 0
@@ -97,6 +111,23 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
                   ' (' + '{:3.0f}'.format(100 * i / len(train_data_loader)) + '%)]  Loss: ' +
                   '{:6.4f}'.format(loss.item()))
             loss_history.append(loss.item())
+
+            if args.verbose:
+                if i >= log_step * 5:
+                    avg_loss = sum(loss_history[-log_step * 5:]) / (log_step * 5)
+                    outlier_thr = 0.8
+                    predicted_class = pred.argmax(dim=1)
+                    if loss > avg_loss * (2 - outlier_thr):
+                        print('High loss')
+                        print('Target classes:    {}'.format(target_to_string(target)))
+                        print('Predicted classes: {}'.format(target_to_string(predicted_class)))
+                        print('----------')
+                    elif loss < avg_loss * outlier_thr:
+                        print('Low loss')
+                        print('Target classes:    {}'.format(target_to_string(target)))
+                        print('Predicted classes: {}'.format(target_to_string(predicted_class)))
+                        print('----------')
+
             start_time = time.time()
 
         if i % save_step == 0 and save_step != -1:
@@ -128,6 +159,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
     }
     torch.save(checkpoint, model_path)
     print('Model successfully saved to {}'.format(model_path))
+    return loss_history
 
 
 def dataset_distribution(dataset, plot=False):
@@ -273,7 +305,7 @@ if __name__ == "__main__":
     start_epoch = 0
     # Load pretrained model
     if os.path.exists(train_config['load_from_checkpoint']):
-        checkpoint = torch.load(train_config['load_from_checkpoint'])
+        checkpoint = torch.load(train_config['load_from_checkpoint'], weights_only=train_config['load_only_weights'])
 
         model.load_state_dict(checkpoint['model_state_dict'])
         if not train_config['load_only_weights']:
@@ -300,21 +332,20 @@ if __name__ == "__main__":
     for e in range(num_epochs):
         epoch = start_epoch + e
         print('Epoch:', epoch)
-        train_epoch(epoch, model, optimizer, lr_sched,
-                    train_data_loader=train_dataloader,
-                    eval_data_loader=val_dataloader,
-                    loss_history=train_loss_history,
-                    loss_func=criterion,
-                    device=device,
-                    log_step=train_config['log_step'],
-                    eval_step=train_config['eval_step'],
-                    save_step=train_config['save_step'],
-                    checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name),
-                    report_to=train_config['report_to'])
+        train_loss_history = train_epoch(epoch, model, optimizer, lr_sched,
+                                         train_data_loader=train_dataloader,
+                                         eval_data_loader=val_dataloader,
+                                         loss_history=train_loss_history,
+                                         loss_func=criterion,
+                                         device=device,
+                                         log_step=train_config['log_step'],
+                                         eval_step=train_config['eval_step'],
+                                         save_step=train_config['save_step'],
+                                         checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name),
+                                         report_to=train_config['report_to'])
 
     print('Training finished.')
     model_path = os.path.join(os.path.join(train_config['checkpoint_save_dir'], model_name), 'model_final.pt')
     os.makedirs(os.path.join(train_config['checkpoint_save_dir'], model_name), exist_ok=True)
     torch.save(model.state_dict(), model_path)
     print('Model successfully saved to {}'.format(model_path))
-

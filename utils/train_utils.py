@@ -22,10 +22,10 @@ def load_config(cfg_path):
     return cfg
 
 
-def init_wandb(project_name, config):
+def init_wandb(project_name, config, name=None):
     system_config = ['PBS_JOBID']
     config['system'] = {}
     for variable in system_config:
         if variable in os.environ.keys():
             config['system'][variable] = os.environ[variable]
-    wandb.init(project=project_name, config=config)
+    wandb.init(project=project_name, config=config, name=name)

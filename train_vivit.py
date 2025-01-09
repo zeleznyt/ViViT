@@ -13,10 +13,44 @@ from torch.utils.data import Subset
 from utils.train_utils import *
 from tqdm import tqdm
 from datetime import datetime
+from sklearn.metrics import confusion_matrix
 
 np.random.seed(0)
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
+
+
+def plot_confusion_matrix(confusion, class_names, save_path=None):
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # Create a grid of colors based on the confusion matrix
+    cax = ax.matshow(confusion, cmap="Blues")
+    fig.colorbar(cax)  # Add a color bar for reference
+
+    # Set axis labels
+    ax.set_xticks(np.arange(len(class_names)))
+    ax.set_yticks(np.arange(len(class_names)))
+    ax.set_xticklabels(class_names, rotation=45, ha="right")
+    ax.set_yticklabels(class_names)
+
+    # Add text annotations
+    for i in range(confusion.shape[0]):
+        for j in range(confusion.shape[1]):
+            ax.text(j, i, str(confusion[i, j]), ha="center", va="center", color="black")
+
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+    plt.title("Confusion Matrix")
+    plt.tight_layout()
+
+    if save_path is not None:
+        # Save the plot as an image
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        print(f"Confusion matrix saved to {save_path}")
+    else:
+        # Display the plot
+        plt.show()
+    return save_path
 
 
 def target_to_string(target):
@@ -38,29 +72,42 @@ def evaluate(model, data_loader, loss_func, device):
     loss = 0
     correct_predictions = 0
     total_predictions = 0
+    all_predictions = []
+    all_targets = []
     with torch.no_grad():
         for i, (data, target, padding_mask) in tqdm(enumerate(data_loader), total=len(data_loader)):
             # Use this to visualize th data
             # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
+
+            # Preprocess data and target
             x = data.to(device)
             padding_mask = padding_mask.to(device)
             data = rearrange(x, 'b p h w c -> b p c h w')
             target = target.type(torch.LongTensor).to(device)
 
+            # Model predictions
             pred = model(data.float(), padding_mask)
-            # logits = np.squeeze(pred.cpu().detach().numpy())
 
+            # Compute loss
             loss += loss_func(pred, target).item()
 
+            # Collect predictions and ground truth
             predicted_class = pred.argmax(dim=1)  # Get the predicted class
-            correct_predictions += (predicted_class == target).sum().item()  # Count correct predictions
-            total_predictions += target.size(0)  # Total number of predictions
+            all_predictions.extend(predicted_class.cpu().numpy())  # Save predictions
+            all_targets.extend(target.cpu().numpy())  # Save ground truth
 
-        # print(target.item(), pred.argmax().item())
-        # print(logits)
+            # Count correct predictions and Total number of predictions
+            correct_predictions += (predicted_class == target).sum().item()
+            total_predictions += target.size(0)
+
+        # Compute final loss and accuracy
         loss = loss / len(data_loader)
         accuracy = correct_predictions / total_predictions
-    return loss, accuracy
+
+        # Compute confusion matrix
+        confusion = confusion_matrix(all_targets, all_predictions, labels=list(range(len(CLASSES))))
+
+    return loss, accuracy, confusion
 
 
 def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None):
@@ -91,12 +138,17 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
 
         if i % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
-            eval_loss, acc = evaluate(model, eval_data_loader, loss_func, device)
+            eval_loss, acc, confusion = evaluate(model, eval_data_loader, loss_func, device)
             wandb.log({"eval/loss": eval_loss,
                        "eval/accuracy": acc},
                       step=lr_sched.last_epoch, commit=False)
 
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')
+            if args.verbose:
+                confusion_matrix_path = os.path.join(checkpoint_save_dir, 'confusion')
+                os.makedirs(confusion_matrix_path, exist_ok=True)
+                plot_path = os.path.join(confusion_matrix_path, 'confusion_{}-{}.jpg'.format(epoch, i))
+                plot_confusion_matrix(confusion, CLASSES, plot_path)
 
         if i % log_step == 0:
             # Log to wandb
@@ -324,6 +376,7 @@ if __name__ == "__main__":
 
     model_name = 'ViVit-B_{}x{}-{}'.format(model_config['patch_size'], model_config['tubelet_size'],
                                            datetime.now().strftime('%Y-%m-%dT%H-%M-%S'))
+    print('Model name: {}'.format(model_name))
 
     project_name = 'ViViT'
     if train_config['report_to'] == 'wandb':

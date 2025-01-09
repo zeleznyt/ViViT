@@ -52,5 +52,6 @@ if __name__ == "__main__":
     loss_func = nn.CrossEntropyLoss()
 
     print('Evaluation started.')
-    eval_loss, acc = evaluate(model, val_dataloader, loss_func, device)
+    eval_loss, acc, confusion = evaluate(model, val_dataloader, loss_func, device)
     print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')
+    print("Confusion Matrix:\n", confusion)

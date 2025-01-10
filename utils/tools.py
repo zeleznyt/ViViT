@@ -1,15 +1,7 @@
 import os.path
-
-import torch
-from einops import rearrange
 import xml.etree.ElementTree as ET
 from datetime import datetime
-from vivit import ViViT
-from dataset import preprocess_video
 from utils.train_utils import *
-import decord
-import numpy as np
-import warnings
 from xml.dom import minidom
 
 

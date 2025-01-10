@@ -1,14 +1,11 @@
 import av
 import numpy as np
-import torch
 import xml.etree.ElementTree as ET
-import sys
 import os
 import json
 import cv2
 from torch.utils.data import Dataset, DataLoader
 import decord
-from decord import VideoReader
 import matplotlib.pyplot as plt
 
 

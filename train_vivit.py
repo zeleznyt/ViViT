@@ -197,8 +197,13 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
 
     print('End of epoch.')
     print('Evaluation started.')
-    eval_loss, acc = evaluate(model, eval_data_loader, loss_func, device)
+    eval_loss, acc, confusion = evaluate(model, eval_data_loader, loss_func, device)
     print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')
+    if args.verbose:
+        confusion_matrix_path = os.path.join(checkpoint_save_dir, 'confusion')
+        os.makedirs(confusion_matrix_path, exist_ok=True)
+        plot_path = os.path.join(confusion_matrix_path, 'confusion_{}-{}.jpg'.format(epoch, i))
+        plot_confusion_matrix(confusion, CLASSES, plot_path)
 
     model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
     os.makedirs(checkpoint_save_dir, exist_ok=True)

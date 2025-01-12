@@ -3,6 +3,8 @@ import json
 import numpy as np
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Subset
+from utils.train_utils import *
+from dataset import VideoDataset, VideoStreamDataset
 
 def convert_to_serializable(obj):
     if isinstance(obj, np.int64):
@@ -82,3 +84,85 @@ def create_split(original_dataset, output_path='dataset_split', dataset_name='Vi
     with open(os.path.join(output_path, dataset_name+'.test.json'), 'w') as fte:
         json.dump(test_data, fte)
     print(f"Test data saved to {os.path.join(output_path, dataset_name+'.test.json')}")
+
+
+def split_by_RAVDAI_TVchannel(original_metadata, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15, seed=42):
+    """
+    Split metafile into train, validation, and test subset metafiles with unified sampling by the TV channels.
+
+    Args:
+        original_metadata: Full metadata (annotation) file to be split.
+        train_ratio: Fraction of data to use for training.
+        val_ratio: Fraction of data to use for validation.
+        test_ratio: Fraction of data to use for testing.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        train_dataset, val_dataset, test_dataset: Metafile subsets of the original metadata file.
+    """
+    assert train_ratio + val_ratio + test_ratio == 1, "Ratios must sum to 1."
+
+    with open(original_metadata, 'r') as metaf:
+        metadata = json.load(metaf)
+
+    base_path = os.path.dirname(original_metadata)
+    metafile_name = os.path.basename(original_metadata)
+
+    annotation_basenames = [os.path.basename(i['video']).split(' ')[0] for i in original_metadata]
+
+    train_idx, remaining_idx = train_test_split(
+        range(len(annotation_basenames)),
+        test_size=val_ratio + test_ratio,
+        stratify=annotation_basenames,
+        random_state=seed
+    )
+
+    val_idx, test_idx = train_test_split(
+        remaining_idx,
+        test_size=test_ratio / (val_ratio + test_ratio),  # Adjust the split proportionally
+        stratify=[annotation_basenames[i] for i in remaining_idx],
+        random_state=seed
+    )
+
+    train_metadata = [metadata[i] for i in train_idx]
+    val_metadata = [metadata[i] for i in val_idx]
+    test_metadata = [metadata[i] for i in test_idx]
+
+    with open(os.path.join(base_path, 'train_'+metafile_name), 'w') as ftr:
+        json.dump(train_metadata, ftr, indent=4)
+    with open(os.path.join(base_path, 'val_'+metafile_name), 'w') as fva:
+        json.dump(val_metadata, fva, indent=4)
+    with open(os.path.join(base_path, 'test_'+metafile_name), 'w') as fte:
+        json.dump(test_metadata, fte, indent=4)
+    print(f"Train data saved to {base_path}.")
+
+
+if __name__ == '__main__':
+    # Process args and config
+    args = parse_args()
+    config = load_config(args.config)
+
+    data_config = config['data']
+
+    # Create dataset
+    print('Loading dataset...')
+    classes = ['studio', 'indoor', 'outdoor']
+    assert data_config['dataset_type'] in ['one_class',
+                                           'stream'], f'Dataset type {data_config["dataset_type"]} not supported'
+    if data_config['dataset_type'] == 'one_class':
+        dataset = VideoDataset(data_config['meta_file'], classes,
+                                     load_from_json=data_config['train_json'],
+                                     frame_sample_rate=data_config['frame_sample_rate'],
+                                     min_sequence_length=data_config['min_sequence_length'],
+                                     max_sequence_length=data_config['max_sequence_length'],
+                                     video_decoder=data_config['video_decoder'], )
+    elif data_config['dataset_type'] == 'stream':
+        dataset = VideoStreamDataset(data_config['meta_file'], classes,
+                                           load_from_json=data_config['train_json'],
+                                           frame_sample_rate=data_config['frame_sample_rate'],
+                                           context_size=data_config['context_size'],
+                                           overlap=data_config['context_size'],
+                                           max_empty_frames=data_config['max_empty_frames'],
+                                           video_decoder=data_config['video_decoder'], )
+    print('Dataset "{}" successfully loaded.'.format(data_config['dataset_type']))
+    create_split(dataset, output_path='dataset_split', dataset_name=data_config['dataset_type'],)

@@ -108,7 +108,7 @@ def split_by_RAVDAI_TVchannel(original_metadata, train_ratio=0.7, val_ratio=0.15
     base_path = os.path.dirname(original_metadata)
     metafile_name = os.path.basename(original_metadata)
 
-    annotation_basenames = [os.path.basename(i['video']).split(' ')[0] for i in original_metadata]
+    annotation_basenames = [i['name'].split(' ')[0] for i in metadata]
 
     train_idx, remaining_idx = train_test_split(
         range(len(annotation_basenames)),
@@ -138,6 +138,7 @@ def split_by_RAVDAI_TVchannel(original_metadata, train_ratio=0.7, val_ratio=0.15
 
 
 if __name__ == '__main__':
+    split_by_RAVDAI_TVchannel('/media/zeleznyt/DATA/data/RAVDAI/new_annot/annotations.json')
     # Process args and config
     args = parse_args()
     config = load_config(args.config)

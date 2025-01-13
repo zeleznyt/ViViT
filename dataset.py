@@ -142,25 +142,25 @@ class VideoDataset(Dataset):
             print(f'Loading data from {load_from_json}')
             with open(load_from_json, 'r') as f:
                 self.data = json.load(f)
-            for item in self.data:
-                video_path = item[0]
-                if video_path not in self.video_handler.keys():
-                    if self.video_decoder == 'pyav':
-                        self.video_handler[video_path] = av.open(video_path)
-                    elif self.video_decoder == 'decord':
-                        self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-                    else:
-                        print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+            # for item in self.data:
+            #     video_path = item[0]
+            #     if video_path not in self.video_handler.keys():
+            #         if self.video_decoder == 'pyav':
+            #             self.video_handler[video_path] = av.open(video_path)
+            #         elif self.video_decoder == 'decord':
+            #             self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
+            #         else:
+            #             print('Unknown video decoder. Must be one of ["pyav", "decord"]')
         else:
             for annotation_file in self.meta_data:
-                video_path = annotation_file['video']
-                if video_path not in self.video_handler.keys():
-                    if self.video_decoder == 'pyav':
-                        self.video_handler[video_path] = av.open(video_path)
-                    elif self.video_decoder == 'decord':
-                        self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-                    else:
-                        print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+                # video_path = annotation_file['video']
+                # if video_path not in self.video_handler.keys():
+                #     if self.video_decoder == 'pyav':
+                #         self.video_handler[video_path] = av.open(video_path)
+                #     elif self.video_decoder == 'decord':
+                #         self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
+                #     else:
+                #         print('Unknown video decoder. Must be one of ["pyav", "decord"]')
 
                 annotation_list = get_eaf(annotation_file['annotation'])
 
@@ -197,7 +197,8 @@ class VideoDataset(Dataset):
             video = read_video_pyav(container=self.video_handler[video_path], indices=indices)
         elif self.video_decoder == 'decord':
             video_path = self.data[index][0]
-            decord_vr = self.video_handler[video_path]
+            decord_vr = decord.VideoReader(video_path, num_threads=1)
+            # decord_vr = self.video_handler[video_path]
             video = list(decord_vr.get_batch(indices).asnumpy())
         else:
             print('Unknown video decoder. Must be one of ["pyav", "decord"]')
@@ -255,31 +256,31 @@ class VideoStreamDataset(VideoDataset):
                     video_list.append(video['video'])
                     self.meta_data.append(meta_data[i])
 
-        self.video_handler = {}
+        # self.video_handler = {}
 
         if load_from_json is not None and os.path.exists(load_from_json):
             print(f'Loading data from {load_from_json}')
             with open(load_from_json, 'r') as f:
                 self.data = json.load(f)
-            for item in self.data:
-                video_path = item[0]
-                if video_path not in self.video_handler.keys():
-                    if self.video_decoder == 'pyav':
-                        self.video_handler[video_path] = av.open(video_path)
-                    elif self.video_decoder == 'decord':
-                        self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-                    else:
-                        print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+            # for item in self.data:
+            #     video_path = item[0]
+                # if video_path not in self.video_handler.keys():
+                #     if self.video_decoder == 'pyav':
+                #         self.video_handler[video_path] = av.open(video_path)
+                #     elif self.video_decoder == 'decord':
+                #         self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
+                #     else:
+                #         print('Unknown video decoder. Must be one of ["pyav", "decord"]')
         else:
             for annotation_file in self.meta_data:
-                video_path = annotation_file['video']
-                if video_path not in self.video_handler.keys():
-                    if self.video_decoder == 'pyav':
-                        self.video_handler[video_path] = av.open(video_path)
-                    elif self.video_decoder == 'decord':
-                        self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-                    else:
-                        print('Unknown video decoder. Must be one of ["pyav", "decord"]')
+                # video_path = annotation_file['video']
+                # if video_path not in self.video_handler.keys():
+                #     if self.video_decoder == 'pyav':
+                #         self.video_handler[video_path] = av.open(video_path)
+                #     elif self.video_decoder == 'decord':
+                #         self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
+                #     else:
+                #         print('Unknown video decoder. Must be one of ["pyav", "decord"]')
 
                 annotation_list = get_eaf(annotation_file['annotation'])
 

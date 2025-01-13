@@ -31,6 +31,7 @@ data:
   video_decoder: decord  # ["decord", "pyav"]
 
 training:
+  seed: 42
   learning_rate: 0.0025
   warmup_epochs: 2.5
   lr_scheduler: cosine  # ["cosine", "constant", "multistep"]

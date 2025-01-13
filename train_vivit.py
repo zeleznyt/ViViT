@@ -15,8 +15,6 @@ from tqdm import tqdm
 from datetime import datetime
 from sklearn.metrics import confusion_matrix
 
-np.random.seed(0)
-
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
 
@@ -274,6 +272,10 @@ if __name__ == "__main__":
     model_config = config['model']
     data_config = config['data']
     train_config = config['training']
+
+    random.seed(train_config['seed'])
+    np.random.seed(train_config['seed'])
+    torch.manual_seed(train_config['seed'])
 
     num_classes = len(CLASSES)
     model_config['num_classes'] = num_classes

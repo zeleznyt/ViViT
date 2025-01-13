@@ -104,7 +104,7 @@ def get_label_on_idx(frame_idx, annotation_list):
 
 class VideoDataset(Dataset):
     def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, min_sequence_length=2,
-                 max_sequence_length=16, input_fps=25, step=1000, video_decoder='decord'):
+                 max_sequence_length=16, input_fps=25, step=1000, video_decoder='decord', num_threads=0):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -124,6 +124,7 @@ class VideoDataset(Dataset):
         self.max_sequence_length = max_sequence_length
         self.input_fps = input_fps
         self.video_decoder = video_decoder
+        self.num_threads = num_threads
         self.step = step
         sampling = self.input_fps * self.frame_sample_rate
 
@@ -197,7 +198,7 @@ class VideoDataset(Dataset):
             video = read_video_pyav(container=self.video_handler[video_path], indices=indices)
         elif self.video_decoder == 'decord':
             video_path = self.data[index][0]
-            decord_vr = decord.VideoReader(video_path, num_threads=1)
+            decord_vr = decord.VideoReader(video_path, num_threads=self.num_threads)
             # decord_vr = self.video_handler[video_path]
             video = list(decord_vr.get_batch(indices).asnumpy())
         else:
@@ -218,7 +219,7 @@ class VideoDataset(Dataset):
 
 class VideoStreamDataset(VideoDataset):
     def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, context_size=8, overlap=2,
-                 max_empty_frames=3, input_fps=25, step=1000, video_decoder='decord'):
+                 max_empty_frames=3, input_fps=25, step=1000, video_decoder='decord', num_threads=0):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -243,6 +244,7 @@ class VideoStreamDataset(VideoDataset):
             self.max_empty_frames = 9999
         self.input_fps = input_fps
         self.video_decoder = video_decoder
+        self.num_threads = num_threads
         self.step = step
         self.max_sequence_length = 2 * context_size + 1
         sampling = self.input_fps * self.frame_sample_rate

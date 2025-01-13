@@ -33,7 +33,7 @@ data:
   shuffle: True
   drop_last: True
   batch_size: 2
-  num_workers: 0  # Higher number not supported yet
+  num_workers: 0
   video_decoder: decord  # ["decord", "pyav"]
 
 training:

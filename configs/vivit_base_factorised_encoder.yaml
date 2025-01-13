@@ -26,7 +26,7 @@ data:
   test_meta_file: example_data_RAVDAI/annotations.json
   shuffle: True
   drop_last: True
-  num_workers: 0  # Higher number not supported yet
+  num_workers: 0
   video_decoder: decord  # ["decord", "pyav"]
 
 training:

@@ -34,6 +34,7 @@ data:
   drop_last: True
   batch_size: 2
   num_workers: 0
+  decord_num_threads: 2
   video_decoder: decord  # ["decord", "pyav"]
 
 training:

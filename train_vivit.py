@@ -136,9 +136,12 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
 
         if i % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
+            eval_start_time = time.time()
             eval_loss, acc, confusion = evaluate(model, eval_data_loader, loss_func, device)
+            eval_end_time = time.time()
             wandb.log({"eval/loss": eval_loss,
-                       "eval/accuracy": acc},
+                       "eval/accuracy": acc,
+                       "eval/time_per_evaluation": eval_end_time - eval_start_time,},
                       step=lr_sched.last_epoch, commit=False)
 
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')

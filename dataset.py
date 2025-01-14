@@ -104,7 +104,7 @@ def get_label_on_idx(frame_idx, annotation_list):
 
 class VideoDataset(Dataset):
     def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, min_sequence_length=2,
-                 max_sequence_length=16, input_fps=25, step=1000, video_decoder='decord', num_threads=0):
+                 max_sequence_length=16, input_fps=25, step=1000, num_threads=0):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -123,7 +123,6 @@ class VideoDataset(Dataset):
         self.min_sequence_length = min_sequence_length
         self.max_sequence_length = max_sequence_length
         self.input_fps = input_fps
-        self.video_decoder = video_decoder
         self.num_threads = num_threads
         self.step = step
         sampling = self.input_fps * self.frame_sample_rate
@@ -137,32 +136,12 @@ class VideoDataset(Dataset):
                     video_list.append(video['video'])
                     self.meta_data.append(meta_data[i])
 
-        self.video_handler = {}
-
         if load_from_json is not None and os.path.exists(load_from_json):
             print(f'Loading data from {load_from_json}')
             with open(load_from_json, 'r') as f:
                 self.data = json.load(f)
-            # for item in self.data:
-            #     video_path = item[0]
-            #     if video_path not in self.video_handler.keys():
-            #         if self.video_decoder == 'pyav':
-            #             self.video_handler[video_path] = av.open(video_path)
-            #         elif self.video_decoder == 'decord':
-            #             self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-            #         else:
-            #             print('Unknown video decoder. Must be one of ["pyav", "decord"]')
         else:
             for annotation_file in self.meta_data:
-                # video_path = annotation_file['video']
-                # if video_path not in self.video_handler.keys():
-                #     if self.video_decoder == 'pyav':
-                #         self.video_handler[video_path] = av.open(video_path)
-                #     elif self.video_decoder == 'decord':
-                #         self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-                #     else:
-                #         print('Unknown video decoder. Must be one of ["pyav", "decord"]')
-
                 annotation_list = get_eaf(annotation_file['annotation'])
 
                 for annotation in annotation_list:
@@ -193,17 +172,9 @@ class VideoDataset(Dataset):
             index: Index of sample to be fetched.
         """
         indices = self.data[index][1]
-        if self.video_decoder == 'pyav':
-            video_path = self.data[index][0]
-            video = read_video_pyav(container=self.video_handler[video_path], indices=indices)
-        elif self.video_decoder == 'decord':
-            video_path = self.data[index][0]
-            decord_vr = decord.VideoReader(video_path, num_threads=self.num_threads)
-            # decord_vr = self.video_handler[video_path]
-            video = list(decord_vr.get_batch(indices).asnumpy())
-        else:
-            print('Unknown video decoder. Must be one of ["pyav", "decord"]')
-            return None
+        video_path = self.data[index][0]
+        decord_vr = decord.VideoReader(video_path, num_threads=self.num_threads)
+        video = list(decord_vr.get_batch(indices).asnumpy())
 
         pad_len = self.max_sequence_length - len(video)
         video_padded = np.pad(video, ((0, pad_len), (0, 0), (0, 0), (0, 0)), 'constant', constant_values=-1)
@@ -219,7 +190,7 @@ class VideoDataset(Dataset):
 
 class VideoStreamDataset(VideoDataset):
     def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, context_size=8, overlap=2,
-                 max_empty_frames=3, input_fps=25, step=1000, video_decoder='decord', num_threads=0):
+                 max_empty_frames=3, input_fps=25, step=1000, num_threads=0):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -243,7 +214,6 @@ class VideoStreamDataset(VideoDataset):
         if self.max_empty_frames == -1:
             self.max_empty_frames = 9999
         self.input_fps = input_fps
-        self.video_decoder = video_decoder
         self.num_threads = num_threads
         self.step = step
         self.max_sequence_length = 2 * context_size + 1
@@ -258,32 +228,12 @@ class VideoStreamDataset(VideoDataset):
                     video_list.append(video['video'])
                     self.meta_data.append(meta_data[i])
 
-        # self.video_handler = {}
-
         if load_from_json is not None and os.path.exists(load_from_json):
             print(f'Loading data from {load_from_json}')
             with open(load_from_json, 'r') as f:
                 self.data = json.load(f)
-            # for item in self.data:
-            #     video_path = item[0]
-                # if video_path not in self.video_handler.keys():
-                #     if self.video_decoder == 'pyav':
-                #         self.video_handler[video_path] = av.open(video_path)
-                #     elif self.video_decoder == 'decord':
-                #         self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-                #     else:
-                #         print('Unknown video decoder. Must be one of ["pyav", "decord"]')
         else:
             for annotation_file in self.meta_data:
-                # video_path = annotation_file['video']
-                # if video_path not in self.video_handler.keys():
-                #     if self.video_decoder == 'pyav':
-                #         self.video_handler[video_path] = av.open(video_path)
-                #     elif self.video_decoder == 'decord':
-                #         self.video_handler[video_path] = decord.VideoReader(video_path, num_threads=1)
-                #     else:
-                #         print('Unknown video decoder. Must be one of ["pyav", "decord"]')
-
                 annotation_list = get_eaf(annotation_file['annotation'])
 
                 mid_frame = self.context_size * sampling

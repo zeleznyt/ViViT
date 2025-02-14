@@ -6,6 +6,60 @@ from torch.utils.data import Subset
 from utils.train_utils import *
 from dataset import VideoDataset, VideoStreamDataset
 
+def get_video_filename(q_file, video_path):
+    for video in os.listdir(video_path):
+        if os.path.isfile(os.path.join(video_path, video)):
+            file_name = video.replace('.mp4', '')
+            if file_name == q_file:
+                return os.path.join(video_path, video)
+    else:
+        return None
+
+
+def create_annotation_file(video_path, eaf_path, output_file='annotations.json'):
+    """
+    Create annotation file from list of videos and eaf files
+    :param video_path: Path to videos
+    :param eaf_path: Path to eaf files
+    :param output_file: Output json file with annotations
+    :return: json contents
+    """
+    annot_list = []
+    id = 0
+    for annotator in os.listdir(eaf_path):
+        if os.path.isdir(os.path.join(eaf_path, annotator)):
+            ann = os.path.join(eaf_path, annotator)
+            for batch in os.listdir(ann):
+                f_b = os.path.join(ann, batch)
+                for file in os.listdir(f_b):
+                    q_file = file.replace('.eaf', '')
+                    video_filename = get_video_filename(q_file, video_path)
+                    if video_filename is not None:
+                        print(file, video_filename, annotator, batch)
+                        annot_list.append(
+                            {'id': id, 'name': q_file, 'video': video_filename, 'annotation': os.path.join(f_b, file),
+                             'annotator': annotator, 'batch': batch})
+                        id += 1
+
+    with open(output_file, 'w') as f:
+        json.dump(annot_list, f)
+    print('Annotation file created.')
+    return annot_list
+
+
+def create_annotations_full_split(video_path, eaf_path, output_dir='/annotations'):
+    """
+    Create train/val/test annotation files from list of videos and eaf files
+    :param video_path: Path to videos
+    :param eaf_path: Path to eaf files
+    :param output_dir: Output directory of the annotation split
+    """
+    full_annotation_file=os.path.join(output_dir, 'annotations.json')
+    create_annotation_file(video_path, eaf_path, output_file=full_annotation_file)
+    split_by_RAVDAI_TVchannel(original_metadata=full_annotation_file)
+    print(f'Annotation file created in {output_dir}.')
+
+
 def convert_to_serializable(obj):
     if isinstance(obj, np.int64):
         return int(obj)

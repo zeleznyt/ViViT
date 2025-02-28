@@ -13,7 +13,7 @@ from torch.utils.data import Subset
 from utils.train_utils import *
 from tqdm import tqdm
 from datetime import datetime
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
@@ -105,7 +105,12 @@ def evaluate(model, data_loader, loss_func, device):
         # Compute confusion matrix
         confusion = confusion_matrix(all_targets, all_predictions, labels=list(range(len(CLASSES))))
 
-    return loss, accuracy, confusion
+        # Compute Precision, Recall, and F1 Score
+        precision = precision_score(all_targets, all_predictions, average='weighted', zero_division=0)
+        recall = recall_score(all_targets, all_predictions, average='weighted', zero_division=0)
+        f1 = f1_score(all_targets, all_predictions, average='weighted', zero_division=0)
+
+    return loss, accuracy, confusion, precision, recall, f1
 
 
 def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None):
@@ -137,10 +142,13 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
         if i % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
             eval_start_time = time.time()
-            eval_loss, acc, confusion = evaluate(model, eval_data_loader, loss_func, device)
+            eval_loss, acc, confusion, precision, recall, f1 = evaluate(model, eval_data_loader, loss_func, device)
             eval_end_time = time.time()
             wandb.log({"eval/loss": eval_loss,
                        "eval/accuracy": acc,
+                       "eval/precision": precision,
+                       "eval/recall": recall,
+                       "eval/f1": f1,
                        "eval/time_per_evaluation": eval_end_time - eval_start_time,},
                       step=lr_sched.last_epoch, commit=False)
 

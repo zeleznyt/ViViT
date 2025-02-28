@@ -152,7 +152,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
                        "eval/time_per_evaluation": eval_end_time - eval_start_time,},
                       step=lr_sched.last_epoch, commit=False)
 
-            print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')
+            print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}, precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}')
             if args.verbose:
                 confusion_matrix_path = os.path.join(checkpoint_save_dir, 'confusion')
                 os.makedirs(confusion_matrix_path, exist_ok=True)

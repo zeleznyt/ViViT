@@ -206,8 +206,8 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
 
     print('End of epoch.')
     print('Evaluation started.')
-    eval_loss, acc, confusion = evaluate(model, eval_data_loader, loss_func, device)
-    print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}')
+    eval_loss, acc, confusion, precision, recall, f1 = evaluate(model, eval_data_loader, loss_func, device)
+    print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}, precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}')
     if args.verbose:
         confusion_matrix_path = os.path.join(checkpoint_save_dir, 'confusion')
         os.makedirs(confusion_matrix_path, exist_ok=True)

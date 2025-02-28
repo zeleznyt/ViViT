@@ -336,8 +336,20 @@ if __name__ == "__main__":
     end = time.time()
     print('Dataset "{}" successfully loaded in {} seconds.'.format(data_config['dataset_type'], end - start))
 
+
     # Set Loss, optimizer and scheduler
-    criterion = nn.CrossEntropyLoss()
+    if train_config['loss'] == 'cross_entropy':
+        criterion = nn.CrossEntropyLoss()
+    elif train_config['loss'] == 'seesaw':
+        from utils.seesaw_loss import SeesawLossWithLogits
+        # class_counts = defaultdict(int)
+        class_counts = [0] * len(CLASSES)
+        print('Counting classes for SeeSawLoss...')
+        for _, label, _ in train_dataset:  # Assuming dataset returns (data, label)
+            class_counts[label] += 1
+        criterion = SeesawLossWithLogits(class_counts=class_counts)
+    else:
+        raise ValueError('Loss {} not recognized.'.format(train_config['loss']))
     if train_config['optimizer'] == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     elif train_config['optimizer'] == 'sgd':

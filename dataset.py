@@ -240,7 +240,7 @@ class VideoDataset(Dataset):
 
 class VideoStreamDataset(VideoDataset):
     def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, context_size=8, overlap=2,
-                 max_empty_frames=3, input_fps=25, step=1000, num_threads=0):
+                 max_empty_frames=3, input_fps=25, step=1000, num_threads=0, normalize=False):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -267,6 +267,7 @@ class VideoStreamDataset(VideoDataset):
         self.num_threads = num_threads
         self.step = step
         self.max_sequence_length = 2 * context_size + 1
+        self.normalize = normalize
         sampling = self.input_fps * self.frame_sample_rate
 
         video_list = []

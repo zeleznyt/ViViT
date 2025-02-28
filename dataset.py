@@ -97,21 +97,22 @@ def normalize_image(image):
     return image
 
 
-def preprocess_image(image, target_size=(224, 224)):
+def preprocess_image(image, target_size=(224, 224), normalize=False):
     # image = cv2.resize(image, (224, 224), interpolation=cv2.INTER_LINEAR)
     # image = cv2.normalize(image, None, 0, 1.0, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
     # Resize and pad
     image = resize_with_padding(image, target_size)
 
     # Normalize
-    image = normalize_image(image)
+    if normalize:
+        image = normalize_image(image)
     return image
 
 
-def preprocess_video(video):
+def preprocess_video(video, normalize=False):
     result = []
     for image in video:
-        result.append(preprocess_image(image))
+        result.append(preprocess_image(image, normalize=normalize))
     return result
 
 
@@ -152,7 +153,7 @@ def get_label_on_idx(frame_idx, annotation_list):
 
 class VideoDataset(Dataset):
     def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, min_sequence_length=2,
-                 max_sequence_length=16, input_fps=25, step=1000, num_threads=0):
+                 max_sequence_length=16, input_fps=25, step=1000, num_threads=0, normalize=False):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -173,6 +174,7 @@ class VideoDataset(Dataset):
         self.input_fps = input_fps
         self.num_threads = num_threads
         self.step = step
+        self.normalize = normalize
         sampling = self.input_fps * self.frame_sample_rate
 
         video_list = []
@@ -229,7 +231,7 @@ class VideoDataset(Dataset):
 
         padding_mask = [False] * len(video) + [True] * pad_len
 
-        video_padded = preprocess_video(video_padded)
+        video_padded = preprocess_video(video_padded, normalize=self.normalize)
         x = np.stack(video_padded)
         y = self.data[index][2]
 

@@ -62,9 +62,49 @@ def get_eaf(eaf_file: str):
     return annotations
 
 
-def preprocess_image(image):
-    image = cv2.resize(image, (224, 224), interpolation=cv2.INTER_LINEAR)
-    image = cv2.normalize(image, None, 0, 1.0, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+def resize_with_padding(image, target_size=(224, 224)):
+    h, w, _ = image.shape
+    target_h, target_w = target_size
+
+    # Calculate the new size that fits within the target size while keeping aspect ratio
+    scale = min(target_w / w, target_h / h)
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+
+    # Resize image
+    resized_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+
+    # Create padding
+    top = (target_h - new_h) // 2
+    bottom = target_h - new_h - top
+    left = (target_w - new_w) // 2
+    right = target_w - new_w - left
+
+    # Add padding (using a gray color like [123, 117, 104] for ImageNet)
+    padded_image = cv2.copyMakeBorder(
+        resized_image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(123, 117, 104)
+    )
+
+    return padded_image
+
+
+def normalize_image(image):
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    # Convert image to float32 and normalize
+    image = image.astype(np.float32) / 255.0
+    image = (image - mean) / std
+    return image
+
+
+def preprocess_image(image, target_size=(224, 224)):
+    # image = cv2.resize(image, (224, 224), interpolation=cv2.INTER_LINEAR)
+    # image = cv2.normalize(image, None, 0, 1.0, cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+    # Resize and pad
+    image = resize_with_padding(image, target_size)
+
+    # Normalize
+    image = normalize_image(image)
     return image
 
 
@@ -73,6 +113,14 @@ def preprocess_video(video):
     for image in video:
         result.append(preprocess_image(image))
     return result
+
+
+def visualize_frame(image, label=None):
+    plt.imshow(image)  # Display image
+    if label is not None:
+        plt.title(label)
+    plt.tight_layout()  # Adjust the layout
+    plt.show()
 
 
 def visualize_frames(video, label=None):

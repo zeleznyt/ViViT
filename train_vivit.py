@@ -312,13 +312,15 @@ if __name__ == "__main__":
                                frame_sample_rate=data_config['frame_sample_rate'],
                                min_sequence_length=data_config['min_sequence_length'],
                                max_sequence_length=data_config['max_sequence_length'],
-                               num_threads=data_config['decord_num_threads'],)
+                               num_threads=data_config['decord_num_threads'],
+                               normalize=data_config['normalize'],)
         val_dataset = VideoDataset(data_config['val_meta_file'], CLASSES,
                                load_from_json=data_config['val_json'],
                                frame_sample_rate=data_config['frame_sample_rate'],
                                min_sequence_length=data_config['min_sequence_length'],
                                max_sequence_length=data_config['max_sequence_length'],
-                               num_threads=data_config['decord_num_threads'],)
+                               num_threads=data_config['decord_num_threads'],
+                               normalize=data_config['normalize'],)
     elif data_config['dataset_type'] == 'stream':
         train_dataset = VideoStreamDataset(data_config['train_meta_file'], CLASSES,
                                      load_from_json=data_config['train_json'],
@@ -326,14 +328,16 @@ if __name__ == "__main__":
                                      context_size=data_config['context_size'],
                                      overlap=data_config['context_size'],
                                      max_empty_frames=data_config['max_empty_frames'],
-                                     num_threads=data_config['decord_num_threads'],)
+                                     num_threads=data_config['decord_num_threads'],
+                                     normalize=data_config['normalize'],)
         val_dataset = VideoStreamDataset(data_config['val_meta_file'], CLASSES,
                                      load_from_json=data_config['val_json'],
                                      frame_sample_rate=data_config['frame_sample_rate'],
                                      context_size=data_config['context_size'],
                                      overlap=data_config['context_size'],
                                      max_empty_frames=data_config['max_empty_frames'],
-                                     num_threads=data_config['decord_num_threads'],)
+                                     num_threads=data_config['decord_num_threads'],
+                                     normalize=data_config['normalize'],)
 
     if train_config['balance_dataset']:
         train_dataset = create_balanced_subset(train_dataset)

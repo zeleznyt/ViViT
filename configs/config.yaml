@@ -28,6 +28,7 @@ data:
   drop_last: True
   num_workers: 0
   decord_num_threads: 2
+  normalize: False
 
 training:
   seed: 42

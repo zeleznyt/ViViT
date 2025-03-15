@@ -408,7 +408,11 @@ if __name__ == "__main__":
 
     train_loss_history, test_loss_history = [], []
 
-    model_name = 'ViVit-B_{}x{}-{}'.format(model_config['patch_size'], model_config['tubelet_size'],
+    if train_config['model_name']:
+        model_name = train_config['model_name']
+    else:
+        model_name = 'ViVit-B'
+    model_name = '{}}_{}x{}-{}'.format(model_name, model_config['patch_size'], model_config['tubelet_size'],
                                            datetime.now().strftime('%Y-%m-%dT%H-%M-%S'))
     print('Model name: {}'.format(model_name))
 

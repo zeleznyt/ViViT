@@ -31,6 +31,7 @@ data:
   normalize: False
 
 training:
+  model_name: ViVit-B
   seed: 42
   learning_rate: 0.0025
   warmup_epochs: 2.5

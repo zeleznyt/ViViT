@@ -136,10 +136,10 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
 
         end_time = time.time()
 
-        if i == 0:
+        if lr_sched.last_epoch == 0:
             continue
 
-        if i % eval_step == 0 and eval_step != -1:
+        if lr_sched.last_epoch % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
             eval_start_time = time.time()
             eval_loss, acc, confusion, precision, recall, f1 = evaluate(model, eval_data_loader, loss_func, device)
@@ -159,7 +159,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
                 plot_path = os.path.join(confusion_matrix_path, 'confusion_{}-{}.jpg'.format(epoch, i))
                 plot_confusion_matrix(confusion, CLASSES, plot_path)
 
-        if i % log_step == 0:
+        if lr_sched.last_epoch % log_step == 0:
             # Log to wandb
             if report_to == 'wandb':
                 wandb.log({"train/loss": loss.item(),
@@ -191,7 +191,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
 
             start_time = time.time()
 
-        if i % save_step == 0 and save_step != -1:
+        if lr_sched.last_epoch % save_step == 0 and save_step != -1:
             model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
             os.makedirs(checkpoint_save_dir, exist_ok=True)
             checkpoint = {

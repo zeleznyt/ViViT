@@ -288,6 +288,18 @@ if __name__ == "__main__":
     np.random.seed(train_config['seed'])
     torch.manual_seed(train_config['seed'])
 
+    if train_config['model_name']:
+        model_name = train_config['model_name']
+    else:
+        model_name = 'ViVit-B'
+    model_name = '{}_{}x{}-{}'.format(model_name, model_config['patch_size'], model_config['tubelet_size'],
+                                           datetime.now().strftime('%Y-%m-%dT%H-%M-%S'))
+    print('Model name: {}'.format(model_name))
+
+    project_name = 'ViViT'
+    if train_config['report_to'] == 'wandb':
+        init_wandb(project_name, config, name=model_name)
+
     num_classes = len(CLASSES)
     model_config['num_classes'] = num_classes
     num_epochs = train_config['epochs']
@@ -407,18 +419,6 @@ if __name__ == "__main__":
         print(f'Model successfully loaded from {train_config["load_from_checkpoint"]}.')
 
     train_loss_history, test_loss_history = [], []
-
-    if train_config['model_name']:
-        model_name = train_config['model_name']
-    else:
-        model_name = 'ViVit-B'
-    model_name = '{}_{}x{}-{}'.format(model_name, model_config['patch_size'], model_config['tubelet_size'],
-                                           datetime.now().strftime('%Y-%m-%dT%H-%M-%S'))
-    print('Model name: {}'.format(model_name))
-
-    project_name = 'ViViT'
-    if train_config['report_to'] == 'wandb':
-        init_wandb(project_name, config, name=model_name)
 
     for e in range(num_epochs):
         epoch = start_epoch + e

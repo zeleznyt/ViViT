@@ -351,14 +351,19 @@ if __name__ == "__main__":
                                      num_threads=data_config['decord_num_threads'],
                                      normalize=data_config['normalize'],)
 
+    end = time.time()
+    print('Dataset "{}" successfully loaded in {} seconds.'.format(data_config['dataset_type'], end - start))
+
     if train_config['balance_dataset']:
+        start = time.time()
+        print('Balancing training dataset...')
         train_dataset = create_balanced_subset(train_dataset)
+        end = time.time()
+        print('Dataset "{}" successfully balanced in {} seconds.'.format(data_config['dataset_type'], end - start))
     train_dataloader = DataLoader(train_dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     val_dataloader = DataLoader(val_dataset, batch_size=data_config['batch_size'], shuffle=False,
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
-    end = time.time()
-    print('Dataset "{}" successfully loaded in {} seconds.'.format(data_config['dataset_type'], end - start))
 
 
     # Set Loss, optimizer and scheduler

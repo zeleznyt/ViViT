@@ -1,12 +1,16 @@
 import numpy as np
-import torch
-import random
+import json
 import time
 from dataset import VideoDataset, VideoStreamDataset
 from utils.train_utils import *
 from train_vivit import create_balanced_subset
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
+
+
+def convert_types(o):
+    if isinstance(o, np.integer):  # Handles int64, int32, etc.
+        return int(o)
 
 
 def save_dataset(data_config, dataset_split='train', output_path='dataset/', balanced_dataset=False):
@@ -39,15 +43,19 @@ def save_dataset(data_config, dataset_split='train', output_path='dataset/', bal
     print('Dataset "{}" successfully loaded in {} seconds.'.format(data_config['dataset_type'], end - start))
 
     if balanced_dataset:
+        # Saving part of the code must be here for Subset
         start = time.time()
         print('Balancing training dataset...')
         balanced_dataset = create_balanced_subset(dataset)
         indexes = balanced_dataset.indices
-
+        data = balanced_dataset.dataset.data
+        new_data = [data[i] for i in indexes]
+        with open(os.path.join(output_path, f'balanced_{dataset_split}_data.json'), 'w') as _f:
+            json.dump(new_data, _f, default=convert_types)
         end = time.time()
         print('Dataset "{}" successfully balanced in {} seconds.'.format(data_config['dataset_type'], end - start))
-
-    return dataset.save_dataset_to_json(os.path.join(output_path, f'{dataset_split}_data.json'))
+    else:
+        return dataset.save_dataset_to_json(os.path.join(output_path, f'{dataset_split}_data.json'))
 
 if __name__ == "__main__":
     # Process args and config

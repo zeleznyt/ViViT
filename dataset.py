@@ -158,12 +158,15 @@ class VideoDataset(Dataset):
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
             classes (`list`): List of classes
+            load_from_json (`str`, None): Path to the json file containing exported data by save_dataset_to_json
             frame_sample_rate (`float`): Frame sampling per second. (5 for processing frame each 5th second)
                                          If not result frame index not int, the number is floored (mainly for rate < 1)
             min_sequence_length (`int`): Minimum number of frames in a sequence
             max_sequence_length (`int`): Maximum number of frames in a sequence
             input_fps (`int`): Frame sampling of input video
             step (`int`): Number of annotation time steps in one second (1000 for milliseconds)
+            num_threads (`int`): Number of threads for decord
+            normalize (`bool`): Normalize the video
         """
         self.meta_file = meta_file
         self.classes = classes
@@ -237,6 +240,22 @@ class VideoDataset(Dataset):
 
         return x, y, np.array(padding_mask)
 
+    def save_dataset_to_json(self, save_dir='dataset/data.json'):
+        """
+        Saves dataset to json file so it doesn't have to be loaded again.
+        Use "load_from_json" to load from json file
+        :param save_dir: Path to save dataset.
+        """
+
+        def convert_types(o):
+            if isinstance(o, np.integer):  # Handles int64, int32, etc.
+                return int(o)
+
+        if not os.path.exists(os.path.dirname(save_dir)):
+            os.makedirs(os.path.dirname(save_dir))
+
+        with open(save_dir, 'w') as _f:
+            json.dump(self.data, _f, default=convert_types)
 
 class VideoStreamDataset(VideoDataset):
     def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, context_size=8, overlap=2,
@@ -245,6 +264,7 @@ class VideoStreamDataset(VideoDataset):
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
             classes (`list`): List of classes
+            load_from_json (`str`, None): Path to the json file containing exported data by save_dataset_to_json
             frame_sample_rate (`float`): Frame sampling per second. (5 for processing frame each 5th second)
                                          If not result frame index not int, the number is floored (mainly for rate < 1)
             context_size (`int`): Size of window (data) is 2 x context_size + 1 (center). 17 by default
@@ -252,6 +272,8 @@ class VideoStreamDataset(VideoDataset):
             max_empty_frames (`int`): Maximum number of frames in a sequence that are not labeled with any class. -1 for unlimited
             input_fps (`int`): Frame sampling of input video
             step (`int`): Number of annotation time steps in one second (1000 for milliseconds)
+            num_threads (`int`): Number of threads for decord
+            normalize (`bool`): Normalize the video
         """
 
         self.meta_file = meta_file

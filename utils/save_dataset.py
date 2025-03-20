@@ -16,13 +16,13 @@ def convert_types(o):
 def save_dataset(data_config, dataset_split='train', output_path='dataset/', balanced_dataset=False):
     assert data_config['dataset_type'] in ['one_class', 'stream'], f'Dataset type {data_config["dataset_type"]} not supported'
     assert dataset_split in ['train', 'val', 'test'], f'Dataset split {dataset_split} not supported'
+    dataset_type = data_config['dataset_type']
 
     # Create dataset
     start = time.time()
     print('Loading dataset...')
-    assert data_config['dataset_type'] in ['one_class', 'stream'], f'Dataset type {data_config["dataset_type"]} not supported'
 
-    if data_config['dataset_type'] == 'one_class':
+    if dataset_type == 'one_class':
         dataset = VideoDataset(data_config[f'{dataset_split}_meta_file'], CLASSES,
                                load_from_json=None,
                                frame_sample_rate=data_config['frame_sample_rate'],
@@ -30,7 +30,7 @@ def save_dataset(data_config, dataset_split='train', output_path='dataset/', bal
                                max_sequence_length=data_config['max_sequence_length'],
                                num_threads=data_config['decord_num_threads'],
                                normalize=data_config['normalize'],)
-    elif data_config['dataset_type'] == 'stream':
+    elif dataset_type == 'stream':
         dataset = VideoStreamDataset(data_config[f'{dataset_split}_meta_file'], CLASSES,
                                      load_from_json=None,
                                      frame_sample_rate=data_config['frame_sample_rate'],
@@ -40,7 +40,7 @@ def save_dataset(data_config, dataset_split='train', output_path='dataset/', bal
                                      num_threads=data_config['decord_num_threads'],
                                      normalize=data_config['normalize'],)
     end = time.time()
-    print('Dataset "{}" successfully loaded in {} seconds.'.format(data_config['dataset_type'], end - start))
+    print('Dataset "{}" successfully loaded in {} seconds.'.format(dataset_type, end - start))
 
     if balanced_dataset:
         # Saving part of the code must be here for Subset
@@ -50,12 +50,14 @@ def save_dataset(data_config, dataset_split='train', output_path='dataset/', bal
         indexes = balanced_dataset.indices
         data = balanced_dataset.dataset.data
         new_data = [data[i] for i in indexes]
-        with open(os.path.join(output_path, f'balanced_{dataset_split}_data.json'), 'w') as _f:
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        with open(os.path.join(output_path, f'balanced_{dataset_type}_{dataset_split}_data.json'), 'w') as _f:
             json.dump(new_data, _f, default=convert_types)
         end = time.time()
-        print('Dataset "{}" successfully balanced in {} seconds.'.format(data_config['dataset_type'], end - start))
+        print('Dataset "{}" successfully balanced in {} seconds.'.format(dataset_type, end - start))
     else:
-        return dataset.save_dataset_to_json(os.path.join(output_path, f'{dataset_split}_data.json'))
+        return dataset.save_dataset_to_json(os.path.join(output_path, f'{dataset_type}_{dataset_split}_data.json'))
 
 if __name__ == "__main__":
     # Process args and config
@@ -64,8 +66,8 @@ if __name__ == "__main__":
 
     data_config = config['data']
 
-    save_dataset(data_config=data_config, dataset_split='train', output_path='dataset/', balanced_dataset=config['training']['balance_dataset'])
-    save_dataset(data_config=data_config, dataset_split='val', output_path='dataset/', balanced_dataset=config['training']['balance_dataset'])
-    save_dataset(data_config=data_config, dataset_split='test', output_path='dataset/', balanced_dataset=config['training']['balance_dataset'])
+    save_dataset(data_config=data_config, dataset_split='train', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])
+    save_dataset(data_config=data_config, dataset_split='val', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])
+    save_dataset(data_config=data_config, dataset_split='test', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])
 
 

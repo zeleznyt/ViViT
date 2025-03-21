@@ -1,6 +1,7 @@
 import numpy as np
 import json
 import time
+import random
 from dataset import VideoDataset, VideoStreamDataset
 from utils.train_utils import *
 from train_vivit import create_balanced_subset
@@ -64,6 +65,7 @@ if __name__ == "__main__":
     args = parse_args()
     config = load_config(args.config)
 
+    random.seed(config['training']['seed'])
     data_config = config['data']
 
     save_dataset(data_config=data_config, dataset_split='train', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])

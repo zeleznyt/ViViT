@@ -259,19 +259,41 @@ def dataset_distribution(dataset, plot=False):
     return class_counts
 
 
-def create_balanced_subset(dataset, n_of_instances=-1):
+def create_balanced_subset(dataset, balance_n_classes=0, n_of_instances=-1):
+    """
+    Randomly samples original dataset indices to create a smaller dataset with balanced class count
+    :param dataset: torch.utils.data.Dataset to be split
+    :param balance_n_classes: balances the dataset so that each class has maximum of instances equal to the class
+        with nth most instances. This is good to balance once class with extremely high number of instances compared
+        to the other classes. 0 by default - no such balance is used.
+    :param n_of_instances: Only used when balance_n_classes == 0. Sets a maximum number of instances for each class.
+        -1 by default - the values is set to a number of instances in the least represented class.
+    :return: Subset. Balanced dataset.
+    """
     class_indices = defaultdict(list)
     for idx, data in enumerate(dataset):
         _, class_label, _ = data
         class_indices[class_label].append(idx)
-    min_class_count = min(len(indices) for indices in class_indices.values())
-    if n_of_instances < 0 or n_of_instances > min_class_count:
-        n_of_instances = min_class_count
-    balanced_indices = []
-    for class_label, indices in class_indices.items():
-        balanced_indices.extend(random.sample(indices, n_of_instances))
-    balanced_subset = Subset(dataset, balanced_indices)
-    print('Balanced subset created with {} instances for each class.'.format(n_of_instances))
+    if balance_n_classes <= 0:
+        min_class_count = min(len(indices) for indices in class_indices.values())
+        if n_of_instances < 0 or n_of_instances > min_class_count:
+            n_of_instances = min_class_count
+        balanced_indices = []
+        for class_label, indices in class_indices.items():
+            balanced_indices.extend(random.sample(indices, n_of_instances))
+        balanced_subset = Subset(dataset, balanced_indices)
+        print('Balanced subset created with {} instances for each class.'.format(n_of_instances))
+    else:
+        sorted_lengths = sorted((len(v) for v in class_indices.values()), reverse=True)
+        nth_longest_length = sorted_lengths[balance_n_classes - 1]
+        balanced_indices = []
+        for class_label, indices in class_indices.items():
+            if len(indices) <= nth_longest_length:
+                balanced_indices.extend(indices)
+            else:
+                balanced_indices.extend(random.sample(indices, nth_longest_length))
+        balanced_subset = Subset(dataset, balanced_indices)
+        print('Balanced subset created with maximum of {} instances for each class.'.format(nth_longest_length))
     return balanced_subset
 
 

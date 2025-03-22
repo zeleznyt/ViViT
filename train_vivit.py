@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import json
 from torch import nn
 from einops import rearrange
 from torch.utils.data import Dataset, DataLoader
@@ -113,9 +114,30 @@ def evaluate(model, data_loader, loss_func, device):
     return loss, accuracy, confusion, precision, recall, f1
 
 
-def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_loader, loss_history, loss_func, device, checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None):
+def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_loader, loss_history, loss_func, device,
+                checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None, eval_metric='f1'):
+    assert eval_metric in ['loss', 'accuracy', 'f1'], "Metric must be one of: 'loss', 'accuracy', 'f1'"
     total_samples = len(train_data_loader.dataset)
     model.train()
+
+    with open(os.path.join(checkpoint_save_dir, 'checkpoints.json'), 'r') as f:
+        all_checkpoints_json = json.load(f)
+    best_checkpoints = all_checkpoints_json['3-best']  # List to store best checkpoint paths with their metric values
+    metric_sign = 1 if eval_metric == 'loss' else -1  # Loss is minimized; others are maximized
+    metric_value = 0 if metric_sign == -1 else 100  # Initiate metric value
+
+    def update_best_checkpoints(checkpoint_path, metric_value):
+        all_checkpoints_json['all'][os.path.basename(checkpoint_path)] = metric_value
+        best_checkpoints.append((checkpoint_path, metric_value))
+        best_checkpoints.sort(key=lambda x: x[1] * metric_sign)  # Sort by metric value
+        all_checkpoints_json['best_checkpoint'] = {os.path.basename(best_checkpoints[0][0]): best_checkpoints[0][1]}
+        if len(best_checkpoints) > 3:
+            ckpt_to_be_removed = best_checkpoints.pop(3)[0]
+            if os.path.exists(ckpt_to_be_removed):
+                os.remove(ckpt_to_be_removed)  # Keep only top 3 based on metric
+        all_checkpoints_json['3-best'] = best_checkpoints
+        with open(os.path.join(checkpoint_save_dir, 'checkpoints.json'), 'w') as f:
+            json.dump(all_checkpoints_json, f, indent=2)
 
     start_time = time.time()
     for i, (data, target, padding_mask) in enumerate(train_data_loader):
@@ -151,8 +173,10 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
                        "eval/f1": f1,
                        "eval/time_per_evaluation": eval_end_time - eval_start_time,},
                       step=lr_sched.last_epoch, commit=False)
-
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}, precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}')
+
+            metric_value = eval_loss if eval_metric == 'loss' else acc if eval_metric == 'accuracy' else f1
+
             if args.verbose:
                 confusion_matrix_path = os.path.join(checkpoint_save_dir, 'confusion')
                 os.makedirs(confusion_matrix_path, exist_ok=True)
@@ -192,7 +216,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
             start_time = time.time()
 
         if lr_sched.last_epoch % save_step == 0 and save_step != -1:
-            model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
+            checkpoint_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
             os.makedirs(checkpoint_save_dir, exist_ok=True)
             checkpoint = {
                 'epoch': epoch,
@@ -201,8 +225,9 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
                 'scheduler_state_dict': lr_sched.state_dict(),
                 'loss': loss,
             }
-            torch.save(checkpoint, model_path)
-            print('Model successfully saved to {}'.format(model_path))
+            torch.save(checkpoint, checkpoint_path)
+            update_best_checkpoints(checkpoint_path, metric_value)
+            print('Model successfully saved to {}'.format(checkpoint_path))
 
     print('End of epoch.')
     print('Evaluation started.')
@@ -214,7 +239,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
         plot_path = os.path.join(confusion_matrix_path, 'confusion_{}-{}.jpg'.format(epoch, i))
         plot_confusion_matrix(confusion, CLASSES, plot_path)
 
-    model_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
+    checkpoint_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
     os.makedirs(checkpoint_save_dir, exist_ok=True)
     checkpoint = {
         'epoch': epoch,
@@ -223,8 +248,9 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
         'scheduler_state_dict': lr_sched.state_dict(),
         'loss': loss,
     }
-    torch.save(checkpoint, model_path)
-    print('Model successfully saved to {}'.format(model_path))
+    torch.save(checkpoint, checkpoint_path)
+    update_best_checkpoints(checkpoint_path, metric_value)
+    print('Model successfully saved to {}'.format(checkpoint_path))
     return loss_history
 
 
@@ -447,6 +473,12 @@ if __name__ == "__main__":
 
     train_loss_history, test_loss_history = [], []
 
+    checkpoint_save_dir = os.path.join(train_config['checkpoint_save_dir'], model_name)
+    os.makedirs(checkpoint_save_dir, exist_ok=True)
+    all_checkpoints_json = {'metric': None, 'best_checkpoint': {}, '3-best': [], 'all': {}}
+    with open(os.path.join(checkpoint_save_dir, 'checkpoints.json'), 'w') as f:
+        json.dump(all_checkpoints_json, f)
+
     for e in range(num_epochs):
         epoch = start_epoch + e
         print('Epoch:', epoch)
@@ -459,7 +491,7 @@ if __name__ == "__main__":
                                          log_step=train_config['log_step'],
                                          eval_step=train_config['eval_step'],
                                          save_step=train_config['save_step'],
-                                         checkpoint_save_dir=os.path.join(train_config['checkpoint_save_dir'], model_name),
+                                         checkpoint_save_dir=checkpoint_save_dir,
                                          report_to=train_config['report_to'])
 
     print('Training finished.')

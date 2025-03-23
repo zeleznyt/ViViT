@@ -123,6 +123,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
     with open(os.path.join(checkpoint_save_dir, 'checkpoints.json'), 'r') as f:
         all_checkpoints_json = json.load(f)
     best_checkpoints = all_checkpoints_json['3-best']  # List to store best checkpoint paths with their metric values
+    all_checkpoints_json['metric'] = eval_metric
     metric_sign = 1 if eval_metric == 'loss' else -1  # Loss is minimized; others are maximized
     metric_value = 0 if metric_sign == -1 else 100  # Initiate metric value
 

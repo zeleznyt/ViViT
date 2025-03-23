@@ -131,10 +131,17 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
         best_checkpoints.append((checkpoint_path, metric_value))
         best_checkpoints.sort(key=lambda x: x[1] * metric_sign)  # Sort by metric value
         all_checkpoints_json['best_checkpoint'] = {os.path.basename(best_checkpoints[0][0]): best_checkpoints[0][1]}
+
         if len(best_checkpoints) > 3:
             ckpt_to_be_removed = best_checkpoints.pop(3)[0]
-            if os.path.exists(ckpt_to_be_removed):
-                os.remove(ckpt_to_be_removed)  # Keep only top 3 based on metric
+            if ckpt_to_be_removed not in [c[0] for c in best_checkpoints]:
+                if ckpt_to_be_removed != checkpoint_path and os.path.exists(ckpt_to_be_removed):  # Do not remove last checkpoint
+                    os.remove(ckpt_to_be_removed)  # Keep only top 3 based on metric
+        latest_checkpoint = all_checkpoints_json['latest_checkpoint']
+        if latest_checkpoint is not None and latest_checkpoint not in [c[0] for c in best_checkpoints]:
+            if latest_checkpoint != checkpoint_path and os.path.exists(latest_checkpoint):
+                os.remove(latest_checkpoint)  # Remove second latest ckpt if it is not in best 3
+        all_checkpoints_json['latest_checkpoint'] = checkpoint_path
         all_checkpoints_json['3-best'] = best_checkpoints
         with open(os.path.join(checkpoint_save_dir, 'checkpoints.json'), 'w') as f:
             json.dump(all_checkpoints_json, f, indent=2)
@@ -475,7 +482,7 @@ if __name__ == "__main__":
 
     checkpoint_save_dir = os.path.join(train_config['checkpoint_save_dir'], model_name)
     os.makedirs(checkpoint_save_dir, exist_ok=True)
-    all_checkpoints_json = {'metric': None, 'best_checkpoint': {}, '3-best': [], 'all': {}}
+    all_checkpoints_json = {'metric': None, 'best_checkpoint': {}, 'latest_checkpoint': None, '3-best': [], 'all': {}}
     with open(os.path.join(checkpoint_save_dir, 'checkpoints.json'), 'w') as f:
         json.dump(all_checkpoints_json, f)
 

@@ -409,8 +409,7 @@ if __name__ == "__main__":
 
     end = time.time()
     print('Dataset "{}" successfully loaded in {} seconds.'.format(data_config['dataset_type'], end - start))
-
-    if train_config['balance_dataset']:
+    if train_config['balance_dataset'] and not os.path.exists(data_config['train_json']):
         start = time.time()
         print('Balancing training dataset...')
         train_dataset = create_balanced_subset(train_dataset)

@@ -46,7 +46,7 @@ def save_dataset(data_config, dataset_split='train', output_path='dataset/', bal
     if balanced_dataset:
         # Saving part of the code must be here for Subset
         start = time.time()
-        print('Balancing training dataset...')
+        print(f'Balancing {dataset_split} dataset...')
         balanced_dataset = create_balanced_subset(dataset)
         indexes = balanced_dataset.indices
         data = balanced_dataset.dataset.data

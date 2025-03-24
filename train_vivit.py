@@ -415,6 +415,7 @@ if __name__ == "__main__":
         train_dataset = create_balanced_subset(train_dataset)
         end = time.time()
         print('Dataset "{}" successfully balanced in {} seconds.'.format(data_config['dataset_type'], end - start))
+    print('Dataset length: {}'.format(len(train_dataset)))
     train_dataloader = DataLoader(train_dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     val_dataloader = DataLoader(val_dataset, batch_size=data_config['batch_size'], shuffle=False,

@@ -423,7 +423,7 @@ if __name__ == "__main__":
 
 
     # Set Loss, optimizer and scheduler
-    if train_config['loss'] == 'cross_entropy':
+    if train_config['loss'] in ['cross_entropy', 'crossentropy']:
         criterion = nn.CrossEntropyLoss()
     elif train_config['loss'] == 'seesaw':
         from utils.seesaw_loss import SeesawLossWithLogits

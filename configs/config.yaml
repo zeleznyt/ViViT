@@ -12,6 +12,7 @@ model:
   max_seq_length: 16
   image_size: 224
   use_vit: False  # To use ViT encoder with Conv2d instead of tubelet with Conv3d. ViT is automatically pretrained on Imagenet.
+  freeze_spatial_encoder: True
 
 data:
   batch_size: 2

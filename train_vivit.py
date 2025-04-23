@@ -332,6 +332,15 @@ def create_balanced_subset(dataset, balance_n_classes=0, n_of_instances=-1):
     return balanced_subset
 
 
+def set_seed(seed_value=42):
+    random.seed(seed_value)  # Python random
+    np.random.seed(seed_value)  # NumPy random
+    torch.manual_seed(seed_value)  # PyTorch (CPU & CUDA)
+    torch.cuda.manual_seed(seed_value)  # GPU-specific seed
+    torch.cuda.manual_seed_all(seed_value)  # Multi-GPU safe
+    torch.backends.cudnn.deterministic = True
+
+
 if __name__ == "__main__":
     # Process args and config
     args = parse_args()
@@ -341,9 +350,7 @@ if __name__ == "__main__":
     data_config = config['data']
     train_config = config['training']
 
-    random.seed(train_config['seed'])
-    np.random.seed(train_config['seed'])
-    torch.manual_seed(train_config['seed'])
+    set_seed(train_config['seed'])
 
     if train_config['model_name']:
         model_name = train_config['model_name']

@@ -174,13 +174,14 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
             eval_start_time = time.time()
             eval_loss, acc, confusion, precision, recall, f1 = evaluate(model, eval_data_loader, loss_func, device)
             eval_end_time = time.time()
-            wandb.log({"eval/loss": eval_loss,
-                       "eval/accuracy": acc,
-                       "eval/precision": precision,
-                       "eval/recall": recall,
-                       "eval/f1": f1,
-                       "eval/time_per_evaluation": eval_end_time - eval_start_time,},
-                      step=lr_sched.last_epoch, commit=False)
+            if train_config['report_to'] == 'wandb':
+                wandb.log({"eval/loss": eval_loss,
+                           "eval/accuracy": acc,
+                           "eval/precision": precision,
+                           "eval/recall": recall,
+                           "eval/f1": f1,
+                           "eval/time_per_evaluation": eval_end_time - eval_start_time,},
+                          step=lr_sched.last_epoch, commit=False)
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}, precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}')
 
             metric_value = eval_loss if eval_metric == 'loss' else acc if eval_metric == 'accuracy' else f1
@@ -424,7 +425,11 @@ if __name__ == "__main__":
 
     # Set Loss, optimizer and scheduler
     if train_config['loss'] in ['cross_entropy', 'crossentropy']:
-        criterion = nn.CrossEntropyLoss()
+        if 'label_smoothing' in train_config:
+            label_smoothing = train_config['label_smoothing']
+        else:
+            label_smoothing = 0.0
+        criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
     elif train_config['loss'] == 'seesaw':
         from utils.seesaw_loss import SeesawLossWithLogits
         # class_counts = defaultdict(int)

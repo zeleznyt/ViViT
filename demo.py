@@ -191,7 +191,7 @@ def predict_and_save_video(video_path: str, output_path: str):
 if __name__ == "__main__":
     # Process args and config
     args = parse_args()
-    assert args.demo_video, "Demo video must be specified"
+    assert args.demo_video or args.demo_video_metadata, "Demo video or metadata must be specified"
     config = load_config(args.config)
 
     model_config = config['model']

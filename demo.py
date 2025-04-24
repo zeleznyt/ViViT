@@ -183,7 +183,7 @@ def predict_and_save_video(video_path: str, output_path: str):
             print(r)
 
     merged_labels = merge_labels(result)
-    video_basename = os.path.splitext(os.path.basename(video_path))
+    video_basename = os.path.splitext(os.path.basename(video_path))[0]
     generate_eaf(merged_labels, os.path.join(output_path, video_basename + '.eaf'), video_path=video_path)
 
 

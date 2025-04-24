@@ -1,3 +1,4 @@
+import json
 import os.path
 
 import torch
@@ -214,9 +215,11 @@ if __name__ == "__main__":
     print('Processing data...')
     os.makedirs(args.demo_output_path, exist_ok=True)
     if args.demo_video_path:
+        assert os.path.exists(args.demo_video_path), print('Test metadata file does not exist')
         print('Processing batch of demo videos from: {}'.format(args.demo_video_path))
-        for video in os.listdir(args.demo_video_path):
-            video_path = os.path.join(args.demo_video_path, video)
+        test_metadata = json.load(open(args.demo_video_path))
+        for video in test_metadata:
+            video_path = video['video']
             predict_and_save_video(video_path, args.demo_output_path)
     else:
         assert 'demo_video' in args, print('Demo video or demo video path must be specified')

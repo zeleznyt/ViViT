@@ -10,6 +10,8 @@ def parse_args():
     # Argument for config file
     parser.add_argument('--config', type=str, required=True, help='Path to the config file')
     parser.add_argument('--demo_video', type=str, required=False, help='Path to the demo video')
+    parser.add_argument('--demo_video_path', type=str, required=False, help='Path to the directory with demo videos')
+    parser.add_argument('--demo_output_path', type=str, default='result/', help='Path to save the result demo files')
     parser.add_argument('--verbose', action='store_true', help='Show debug info')
 
     # Parse arguments and return them

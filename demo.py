@@ -1,3 +1,5 @@
+import os.path
+
 import torch
 from einops import rearrange
 import xml.etree.ElementTree as ET
@@ -158,6 +160,33 @@ def generate_eaf(merged_labels, output_file, video_path=""):
     print('Result saved to', output_file)
 
 
+def predict_and_save_video(video_path: str, output_path: str):
+    result = []
+    # Load the video
+    video_handler = decord.VideoReader(video_path, num_threads=1)
+    # Iterate over frame with a context window
+    for i in range(data_config['context_size'], len(video_handler) - data_config['context_size'] + 1, 25):
+        indexes = list(range(i - data_config['context_size'], i + data_config['context_size'] + 1))
+        video = list(video_handler.get_batch(indexes).asnumpy())
+        processed_video = preprocess_video(video)
+        processed_video = rearrange(np.stack(processed_video), 't h w c -> t c h w')
+        processed_video = torch.from_numpy(processed_video).float().to(device)
+        processed_video = processed_video.unsqueeze(0)
+
+        prediction = model(processed_video,
+                           padding_mask=torch.tensor([False] * processed_video.shape[1]).unsqueeze(0).cuda())
+        predicted_class = prediction.argmax(dim=1)
+        r = {'frame_index': i, 'start_frame_timestamp': video_handler.get_frame_timestamp(i)[0],
+             'end_frame_timestamp': video_handler.get_frame_timestamp(i)[1], 'label': CLASSES[predicted_class]}
+        result.append(r)
+        if args.verbose:
+            print(r)
+
+    merged_labels = merge_labels(result)
+    video_basename = os.path.splitext(os.path.basename(video_path))
+    generate_eaf(merged_labels, os.path.join(output_path, video_basename + '.eaf'), video_path=video_path)
+
+
 if __name__ == "__main__":
     # Process args and config
     args = parse_args()
@@ -183,25 +212,13 @@ if __name__ == "__main__":
     print('Model loaded.')
 
     print('Processing data...')
-    result = []
-    # Load the video
-    video_handler = decord.VideoReader(args.demo_video, num_threads=1)
-    # Iterate over frame with a context window
-    for i in range(data_config['context_size'], len(video_handler) - data_config['context_size'] + 1, 25):
-        indexes = list(range(i - data_config['context_size'], i + data_config['context_size'] + 1))
-        video = list(video_handler.get_batch(indexes).asnumpy())
-        processed_video = preprocess_video(video)
-        processed_video = rearrange(np.stack(processed_video), 't h w c -> t c h w')
-        processed_video = torch.from_numpy(processed_video).float().to(device)
-        processed_video = processed_video.unsqueeze(0)
-
-        prediction = model(processed_video, padding_mask=torch.tensor([False] * processed_video.shape[1]).unsqueeze(0).cuda())
-        predicted_class = prediction.argmax(dim=1)
-        r = {'frame_index': i, 'start_frame_timestamp': video_handler.get_frame_timestamp(i)[0],
-             'end_frame_timestamp': video_handler.get_frame_timestamp(i)[1], 'label': CLASSES[predicted_class]}
-        result.append(r)
-        if args.verbose:
-            print(r)
-
-    merged_labels = merge_labels(result)
-    generate_eaf(merged_labels, '/media/zeleznyt/DATA/repo/ViViT/result.eaf', video_path=args.demo_video)
+    os.makedirs(args.demo_output_path, exist_ok=True)
+    if args.demo_video_path:
+        print('Processing batch of demo videos from: {}'.format(args.demo_video_path))
+        for video in os.listdir(args.demo_video_path):
+            video_path = os.path.join(args.demo_video_path, video)
+            predict_and_save_video(video_path, args.demo_output_path)
+    else:
+        assert 'demo_video' in args, print('Demo video or demo video path must be specified')
+        print('Processing single video: {}'.format(args.demo_video))
+        predict_and_save_video(args.demo_video, args.demo_output_path)

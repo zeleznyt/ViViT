@@ -214,10 +214,10 @@ if __name__ == "__main__":
 
     print('Processing data...')
     os.makedirs(args.demo_output_path, exist_ok=True)
-    if args.demo_video_path:
-        assert os.path.exists(args.demo_video_path), print('Test metadata file does not exist')
-        print('Processing batch of demo videos from: {}'.format(args.demo_video_path))
-        test_metadata = json.load(open(args.demo_video_path))
+    if args.demo_video_metadata:
+        assert os.path.exists(args.demo_video_metadata), print('Test metadata file does not exist')
+        print('Processing batch of demo videos from: {}'.format(args.demo_video_metadata))
+        test_metadata = json.load(open(args.demo_video_metadata))
         for video in test_metadata:
             video_path = video['video']
             predict_and_save_video(video_path, args.demo_output_path)

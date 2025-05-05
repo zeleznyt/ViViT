@@ -14,7 +14,7 @@ from torch.utils.data import Subset
 from utils.train_utils import *
 from tqdm import tqdm
 from datetime import datetime
-from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, precision_recall_fscore_support
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
@@ -111,7 +111,21 @@ def evaluate(model, data_loader, loss_func, device):
         recall = recall_score(all_targets, all_predictions, average='weighted', zero_division=0)
         f1 = f1_score(all_targets, all_predictions, average='weighted', zero_division=0)
 
-    return loss, accuracy, confusion, precision, recall, f1
+        # NEW: Per-class metrics
+        per_class_precision, per_class_recall, per_class_f1, _ = precision_recall_fscore_support(
+            all_targets, all_predictions, labels=list(range(len(CLASSES))), zero_division=0
+        )
+
+        per_class_metrics = {
+            cls: {
+                "precision": round(per_class_precision[i], 4),
+                "recall": round(per_class_recall[i], 4),
+                "f1": round(per_class_f1[i], 4)
+            }
+            for i, cls in enumerate(CLASSES)
+        }
+
+    return loss, accuracy, confusion, precision, recall, f1, per_class_metrics
 
 
 def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_loader, loss_history, loss_func, device,
@@ -172,7 +186,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
         if lr_sched.last_epoch % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
             eval_start_time = time.time()
-            eval_loss, acc, confusion, precision, recall, f1 = evaluate(model, eval_data_loader, loss_func, device)
+            eval_loss, acc, confusion, precision, recall, f1, per_class_metrics = evaluate(model, eval_data_loader, loss_func, device)
             eval_end_time = time.time()
             if train_config['report_to'] == 'wandb':
                 wandb.log({"eval/loss": eval_loss,
@@ -182,7 +196,19 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
                            "eval/f1": f1,
                            "eval/time_per_evaluation": eval_end_time - eval_start_time,},
                           step=lr_sched.last_epoch, commit=False)
+
+                # Log per-class metrics
+                for class_name, metrics in per_class_metrics.items():
+                    wandb.log({
+                        f"eval/per_class/{class_name}/precision": metrics['precision'],
+                        f"eval/per_class/{class_name}/recall": metrics['recall'],
+                        f"eval/per_class/{class_name}/f1": metrics['f1'],
+                    }, step=lr_sched.last_epoch, commit=False)
+
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}, precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}')
+            print("Per-class metrics:")
+            for class_name, metrics in per_class_metrics.items():
+                print(f"{class_name}: P={metrics['precision']}, R={metrics['recall']}, F1={metrics['f1']}")
 
             metric_value = eval_loss if eval_metric == 'loss' else acc if eval_metric == 'accuracy' else f1
 

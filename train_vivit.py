@@ -106,6 +106,14 @@ def evaluate(model, data_loader, loss_func, device):
         # Compute confusion matrix
         confusion = confusion_matrix(all_targets, all_predictions, labels=list(range(len(CLASSES))))
 
+        # Per-class accuracy: diagonal / row sum
+        per_class_accuracy = {}
+        for i, class_name in enumerate(CLASSES):
+            true_positives = confusion[i, i]
+            total = confusion[i].sum()
+            acc = true_positives / total if total > 0 else 0.0
+            per_class_accuracy[class_name] = round(acc, 4)
+
         # Compute Precision, Recall, and F1 Score
         precision = precision_score(all_targets, all_predictions, average='weighted', zero_division=0)
         recall = recall_score(all_targets, all_predictions, average='weighted', zero_division=0)
@@ -125,7 +133,7 @@ def evaluate(model, data_loader, loss_func, device):
             for i, cls in enumerate(CLASSES)
         }
 
-    return loss, accuracy, confusion, precision, recall, f1, per_class_metrics
+    return loss, accuracy, confusion, precision, recall, f1, per_class_metrics, per_class_accuracy
 
 
 def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_loader, loss_history, loss_func, device,
@@ -186,7 +194,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
         if lr_sched.last_epoch % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
             eval_start_time = time.time()
-            eval_loss, acc, confusion, precision, recall, f1, per_class_metrics = evaluate(model, eval_data_loader, loss_func, device)
+            eval_loss, acc, confusion, precision, recall, f1, per_class_metrics, per_class_accuracy = evaluate(model, eval_data_loader, loss_func, device)
             eval_end_time = time.time()
             if train_config['report_to'] == 'wandb':
                 wandb.log({"eval/loss": eval_loss,
@@ -203,6 +211,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
                         f"eval/per_class/{class_name}/precision": metrics['precision'],
                         f"eval/per_class/{class_name}/recall": metrics['recall'],
                         f"eval/per_class/{class_name}/f1": metrics['f1'],
+                        f"eval/per_class/{class_name}/accuracy": per_class_accuracy[class_name],
                     }, step=lr_sched.last_epoch, commit=False)
 
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}, precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}')

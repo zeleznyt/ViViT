@@ -66,6 +66,35 @@ def target_to_string(target):
     return [CLASSES[idx] for idx in target]
 
 
+def compute_per_class_metrics(y_true, y_pred, class_names):
+    labels = list(range(len(class_names)))
+    confusion = confusion_matrix(y_true, y_pred, labels=labels)
+
+    # Per-class accuracy
+    per_class_accuracy = {}
+    for i, class_name in enumerate(class_names):
+        correct = confusion[i, i]
+        total = confusion[i].sum()
+        acc = correct / total if total > 0 else 0.0
+        per_class_accuracy[class_name] = round(acc, 4)
+
+    # Per-class precision, recall, f1
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        y_true, y_pred, labels=labels, zero_division=0
+    )
+
+    per_class_metrics = {
+        class_names[i]: {
+            "precision": round(precision[i], 4),
+            "recall": round(recall[i], 4),
+            "f1": round(f1[i], 4)
+        }
+        for i in range(len(class_names))
+    }
+
+    return confusion, per_class_metrics, per_class_accuracy
+
+
 def evaluate(model, data_loader, loss_func, device):
     model.eval()
     loss = 0
@@ -103,35 +132,12 @@ def evaluate(model, data_loader, loss_func, device):
         loss = loss / len(data_loader)
         accuracy = correct_predictions / total_predictions
 
-        # Compute confusion matrix
-        confusion = confusion_matrix(all_targets, all_predictions, labels=list(range(len(CLASSES))))
-
-        # Per-class accuracy: diagonal / row sum
-        per_class_accuracy = {}
-        for i, class_name in enumerate(CLASSES):
-            true_positives = confusion[i, i]
-            total = confusion[i].sum()
-            acc = true_positives / total if total > 0 else 0.0
-            per_class_accuracy[class_name] = round(acc, 4)
+        confusion, per_class_metrics, per_class_accuracy = compute_per_class_metrics(all_targets, all_predictions, CLASSES)
 
         # Compute Precision, Recall, and F1 Score
         precision = precision_score(all_targets, all_predictions, average='weighted', zero_division=0)
         recall = recall_score(all_targets, all_predictions, average='weighted', zero_division=0)
         f1 = f1_score(all_targets, all_predictions, average='weighted', zero_division=0)
-
-        # NEW: Per-class metrics
-        per_class_precision, per_class_recall, per_class_f1, _ = precision_recall_fscore_support(
-            all_targets, all_predictions, labels=list(range(len(CLASSES))), zero_division=0
-        )
-
-        per_class_metrics = {
-            cls: {
-                "precision": round(per_class_precision[i], 4),
-                "recall": round(per_class_recall[i], 4),
-                "f1": round(per_class_f1[i], 4)
-            }
-            for i, cls in enumerate(CLASSES)
-        }
 
     return loss, accuracy, confusion, precision, recall, f1, per_class_metrics, per_class_accuracy
 
@@ -217,7 +223,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}, precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}')
             print("Per-class metrics:")
             for class_name, metrics in per_class_metrics.items():
-                print(f"{class_name}: P={metrics['precision']}, R={metrics['recall']}, F1={metrics['f1']}")
+                print(f"{class_name}: P={metrics['precision']}, R={metrics['recall']}, F1={metrics['f1']}, Accuracy={per_class_accuracy[class_name]}")
 
             metric_value = eval_loss if eval_metric == 'loss' else acc if eval_metric == 'accuracy' else f1
 

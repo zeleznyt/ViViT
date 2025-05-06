@@ -40,6 +40,7 @@ training:
   optimizer: sgd  # ["adam, sgd"]
   loss: seesaw # [crossentropy, seesaw]
   label_smoothing: 0.2 # Only for crossentropy loss
+  gradient_accumulation_steps: 4
   epochs: 50
   log_step: 50
   eval_step: 50

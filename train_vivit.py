@@ -142,7 +142,7 @@ def evaluate(model, data_loader, loss_func, device):
     return loss, accuracy, confusion, precision, recall, f1, per_class_metrics, per_class_accuracy
 
 
-def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_loader, loss_history, loss_func, device,
+def train_epoch(epoch, model, optimizer, lr_sched, gradient_accumulation_steps, train_data_loader, eval_data_loader, loss_history, loss_func, device,
                 checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None, eval_metric='f1'):
     assert eval_metric in ['loss', 'accuracy', 'f1'], "Metric must be one of: 'loss', 'accuracy', 'f1'"
     total_samples = len(train_data_loader.dataset)
@@ -179,7 +179,8 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
     for i, (data, target, padding_mask) in enumerate(train_data_loader):
         # Use this to visualize the data
         # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
-        optimizer.zero_grad()
+        if i % gradient_accumulation_steps == 0:
+            optimizer.zero_grad()
         x = data.to(device)
         padding_mask = padding_mask.to(device)
         data = rearrange(x, 'b p h w c -> b p c h w')
@@ -188,9 +189,11 @@ def train_epoch(epoch, model, optimizer, lr_sched, train_data_loader, eval_data_
         pred = model(data.float(), padding_mask)
 
         loss = loss_func(pred, target)
+        loss = loss / gradient_accumulation_steps  # Normalize loss
         loss.backward()
-        optimizer.step()
-        lr_sched.step()
+        if (i + 1) % gradient_accumulation_steps == 0 or (i + 1) == len(train_data_loader):
+            optimizer.step()
+            lr_sched.step()
 
         end_time = time.time()
 
@@ -550,6 +553,7 @@ if __name__ == "__main__":
         epoch = start_epoch + e
         print('Epoch:', epoch)
         train_loss_history = train_epoch(epoch, model, optimizer, lr_sched,
+                                         gradient_accumulation_steps = train_config['gradient_accumulation_steps'],
                                          train_data_loader=train_dataloader,
                                          eval_data_loader=val_dataloader,
                                          loss_history=train_loss_history,

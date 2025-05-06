@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import vit_b_16
+from torchvision.models import resnet50, ResNet50_Weights
 import einops
 from einops import rearrange, repeat
 import yaml
@@ -89,6 +90,21 @@ class ViT(nn.Module):
         return x # Return the class token (batch_size, n_frames, embed_dim)
 
 
+class ResNetEmbedder(nn.Module):
+    def __init__(self):
+        super(ResNetEmbedder, self).__init__()
+        resnet = resnet50(weights=ResNet50_Weights.DEFAULT)
+        self.features = nn.Sequential(*list(resnet.children())[:-1])  # Remove the classification head
+        self.embed_dim = resnet.fc.in_features
+
+    def forward(self, x):
+        b, t, c, h, w = x.shape
+        x = rearrange(x, 'b t c h w -> (b t) c h w')
+        x = self.features(x).squeeze(-1).squeeze(-1)  # Output shape: (b*t, embed_dim)
+        x = rearrange(x, '(b t) d -> b t d', b=b)
+        return x  # (b, t, embed_dim)
+
+
 class TemporalTransformer(nn.Module):
     def __init__(self, embed_dim=768, num_heads=12, dim_feedforward=2048, num_layers=12, seq_length=16):
         super(TemporalTransformer, self).__init__()
@@ -126,31 +142,52 @@ class ViViT(nn.Module):
     def __init__(self, config):
         super(ViViT, self).__init__()
         self.config = config
-        if config['use_vit']:
-            torch._assert(config['tubelet_size'] == 1, f"tubelet_size must be 1 when using use_vit==True!")
+        # if config['use_vit']:
+        #     torch._assert(config['tubelet_size'] == 1, f"tubelet_size must be 1 when using use_vit==True!")
+        #     self.spatial_transformer = ViT()
+        # else:
+        #     self.spatial_transformer = SpatialTransformer(embed_dim=config['embed_dim'],
+        #                                                     num_heads=config['spatial_num_heads'],
+        #                                                     dim_feedforward=config['spatial_mlp_dim'],
+        #                                                     num_layers=config['spatial_num_layers'],
+        #                                                     patch_size=config['patch_size'],
+        #                                                     tubelet_size=config['tubelet_size'],
+        #                                                     image_size=config['image_size'])
+
+        if config.get('use_pretrained_encoder', False) == 'vit':
+            torch._assert(config['tubelet_size'] == 1, "tubelet_size must be 1 when using use_vit==True!")
             self.spatial_transformer = ViT()
+            embed_dim = 768
+        elif config.get('use_pretrained_encoder', False) == 'resnet':
+            torch._assert(config['tubelet_size'] == 1, "tubelet_size must be 1 when using use_resnet==True!")
+            self.spatial_transformer = ResNetEmbedder()
+            embed_dim = self.spatial_transformer.embed_dim
         else:
-            self.spatial_transformer = SpatialTransformer(embed_dim=config['embed_dim'],
-                                                            num_heads=config['spatial_num_heads'],
-                                                            dim_feedforward=config['spatial_mlp_dim'],
-                                                            num_layers=config['spatial_num_layers'],
-                                                            patch_size=config['patch_size'],
-                                                            tubelet_size=config['tubelet_size'],
-                                                            image_size=config['image_size'])
-        self.temporal_transformer = TemporalTransformer(embed_dim=config['embed_dim'],
+            self.spatial_transformer = SpatialTransformer(
+                embed_dim=config['embed_dim'],
+                num_heads=config['spatial_num_heads'],
+                dim_feedforward=config['spatial_mlp_dim'],
+                num_layers=config['spatial_num_layers'],
+                patch_size=config['patch_size'],
+                tubelet_size=config['tubelet_size'],
+                image_size=config['image_size']
+            )
+            embed_dim = config['embed_dim']
+
+        self.temporal_transformer = TemporalTransformer(embed_dim=embed_dim,
                                                         num_heads=config['temporal_num_heads'],
                                                         dim_feedforward=config['temporal_mlp_dim'],
                                                         num_layers=config['temporal_num_layers'],
                                                         seq_length=config['max_seq_length'])
         # self.classifier = nn.Linear(embed_dim, num_classes)
         self.classifier = nn.Sequential(
-            nn.Linear(config['embed_dim'], config['num_classes'])
+            nn.Linear(embed_dim, config['num_classes'])
         )
 
     def forward(self, x, padding_mask):
         b, t, c, h, w = x.shape
 
-        if self.config['use_vit']:
+        if self.config['use_pretrained_encoder'] in ['vit', 'resnet']:
             step = 1
         else:
             step = self.config['tubelet_size']

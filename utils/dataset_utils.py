@@ -216,7 +216,7 @@ if __name__ == '__main__':
                                            load_from_json=data_config['train_json'],
                                            frame_sample_rate=data_config['frame_sample_rate'],
                                            context_size=data_config['context_size'],
-                                           overlap=data_config['context_size'],
+                                           overlap=data_config['overlap'],
                                            max_empty_frames=data_config['max_empty_frames'],
                                            video_decoder=data_config['video_decoder'], )
     print('Dataset "{}" successfully loaded.'.format(data_config['dataset_type']))

@@ -51,4 +51,4 @@ training:
 
 evaluation:
   checkpoint: checkpoints/model.pt
-  dataset_meta_file: example_data_RAVDAI/annotations.json
+  output_path: result/

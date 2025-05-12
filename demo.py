@@ -1,6 +1,6 @@
 import json
 import os.path
-
+import tqdm
 import torch
 from einops import rearrange
 import xml.etree.ElementTree as ET
@@ -50,6 +50,10 @@ def merge_labels(predictions):
     return merged_labels
 
 
+def timestamp_to_index(timestamp): # Timestamp in seconds
+    return int(round(timestamp * 25))
+
+
 def generate_eaf(merged_labels, output_file, video_path=""):
     """Generate an EAF file from the merged list of labels."""
 
@@ -96,8 +100,8 @@ def generate_eaf(merged_labels, output_file, video_path=""):
     for i, item in enumerate(merged_labels):
         ts_start_id = f"ts{i * 2 + 1}"
         ts_end_id = f"ts{i * 2 + 2}"
-        time_slot_map[item['frame_indexes'][0]] = ts_start_id
-        time_slot_map[item['frame_indexes'][-1]] = ts_end_id
+        time_slot_map[timestamp_to_index(item['start_frame_timestamp'])] = ts_start_id
+        time_slot_map[timestamp_to_index(item['end_frame_timestamp'])-1000//25] = ts_end_id # Substract one frame so the timestamps don't overwrite
         ET.SubElement(time_order, "TIME_SLOT", {
             "TIME_SLOT_ID": ts_start_id,
             "TIME_VALUE": str(int(item['start_frame_timestamp'] * 1000))
@@ -121,8 +125,8 @@ def generate_eaf(merged_labels, output_file, video_path=""):
         alignable_annotation = ET.SubElement(annotation, "ALIGNABLE_ANNOTATION", {
             "ANNOTATION_ID": f"a{idx + 1}",
             "CVE_REF": label_to_cveid.get(item['label'], "unknown_cveid"),
-            "TIME_SLOT_REF1": time_slot_map[item['frame_indexes'][0]],
-            "TIME_SLOT_REF2": time_slot_map[item['frame_indexes'][-1]]
+            "TIME_SLOT_REF1": time_slot_map[timestamp_to_index(item['start_frame_timestamp'])],
+            "TIME_SLOT_REF2": time_slot_map[timestamp_to_index(item['end_frame_timestamp'])-1000//25]
         })
         ET.SubElement(alignable_annotation, "ANNOTATION_VALUE").text = item['label']
 
@@ -161,27 +165,43 @@ def generate_eaf(merged_labels, output_file, video_path=""):
     print('Result saved to', output_file)
 
 
-def predict_and_save_video(video_path: str, output_path: str):
+def predict_and_save_video(video_path: str, output_path: str, output_resolution=1):
+    """
+    Predict per frame prediction and save result in eaf file
+    :param video_path: Input video path
+    :param output_path: Path to save result eaf file
+    :param output_resolution: Resolution of the predicted eaf track.
+            Default: 1 ~ predict each frame
+            Output_resolution: 25 ~ predict frame each second (fps = 25)
+    :return:
+    """
     result = []
     # Load the video
     video_handler = decord.VideoReader(video_path, num_threads=1)
     # Iterate over frame with a context window
-    for i in range(data_config['context_size'], len(video_handler) - data_config['context_size'] + 1, 25):
-        indexes = list(range(i - data_config['context_size'], i + data_config['context_size'] + 1))
-        video = list(video_handler.get_batch(indexes).asnumpy())
-        processed_video = preprocess_video(video)
-        processed_video = rearrange(np.stack(processed_video), 't h w c -> t c h w')
-        processed_video = torch.from_numpy(processed_video).float().to(device)
-        processed_video = processed_video.unsqueeze(0)
+    last_possible_frame = len(video_handler) - data_config['context_size'] + 1
+    with torch.no_grad():
+        for i in tqdm.tqdm(range(data_config['context_size'], last_possible_frame, output_resolution)):
+            indexes = list(range(i - data_config['context_size'], i + data_config['context_size'] + 1))
+            video = list(video_handler.get_batch(indexes).asnumpy())
+            processed_video = preprocess_video(video, normalize=True)
+            processed_video = rearrange(np.stack(processed_video), 't h w c -> t c h w')
+            processed_video = torch.from_numpy(processed_video).float().to(device)
+            processed_video = processed_video.unsqueeze(0)
 
-        prediction = model(processed_video,
-                           padding_mask=torch.tensor([False] * processed_video.shape[1]).unsqueeze(0).cuda())
-        predicted_class = prediction.argmax(dim=1)
-        r = {'frame_index': i, 'start_frame_timestamp': video_handler.get_frame_timestamp(i)[0],
-             'end_frame_timestamp': video_handler.get_frame_timestamp(i)[1], 'label': CLASSES[predicted_class]}
-        result.append(r)
-        if args.verbose:
-            print(r)
+            prediction = model(processed_video,
+                               padding_mask=torch.tensor([False] * processed_video.shape[1]).unsqueeze(0).cuda())
+            predicted_class = prediction.argmax(dim=1)
+            start_time = video_handler.get_frame_timestamp(i)[0]
+            if (i+output_resolution-1) > last_possible_frame:
+                end_time = video_handler.get_frame_timestamp(last_possible_frame)[1]
+            else:
+                end_time = video_handler.get_frame_timestamp(i+output_resolution-1)[1]
+            r = {'frame_index': i, 'start_frame_timestamp': start_time,
+                 'end_frame_timestamp': end_time, 'label': CLASSES[predicted_class]}
+            result.append(r)
+            if args.verbose:
+                print(r)
 
     merged_labels = merge_labels(result)
     video_basename = os.path.splitext(os.path.basename(video_path))[0]
@@ -220,8 +240,8 @@ if __name__ == "__main__":
         test_metadata = json.load(open(args.demo_video_metadata))
         for video in test_metadata:
             video_path = video['video']
-            predict_and_save_video(video_path, args.demo_output_path)
+            predict_and_save_video(video_path, args.demo_output_path, 25)
     else:
         assert 'demo_video' in args, print('Demo video or demo video path must be specified')
         print('Processing single video: {}'.format(args.demo_video))
-        predict_and_save_video(args.demo_video, args.demo_output_path)
+        predict_and_save_video(args.demo_video, args.demo_output_path, 25)

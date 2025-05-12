@@ -50,11 +50,11 @@ def merge_labels(predictions):
     return merged_labels
 
 
-def timestamp_to_index(timestamp): # Timestamp in seconds
-    return int(round(timestamp * 25))
+def timestamp_to_index(timestamp, fps=25): # Timestamp in seconds
+    return int(round(timestamp * fps))
 
 
-def generate_eaf(merged_labels, output_file, video_path=""):
+def generate_eaf(merged_labels, output_file, video_path="", fps=25):
     """Generate an EAF file from the merged list of labels."""
 
     # Predefined CVE_IDs for labels
@@ -100,8 +100,8 @@ def generate_eaf(merged_labels, output_file, video_path=""):
     for i, item in enumerate(merged_labels):
         ts_start_id = f"ts{i * 2 + 1}"
         ts_end_id = f"ts{i * 2 + 2}"
-        time_slot_map[timestamp_to_index(item['start_frame_timestamp'])] = ts_start_id
-        time_slot_map[timestamp_to_index(item['end_frame_timestamp'])-1000//25] = ts_end_id # Substract one frame so the timestamps don't overwrite
+        time_slot_map[timestamp_to_index(item['start_frame_timestamp'], fps)] = ts_start_id
+        time_slot_map[timestamp_to_index(item['end_frame_timestamp'], fps)-1000//fps] = ts_end_id # Substract one frame so the timestamps don't overwrite
         ET.SubElement(time_order, "TIME_SLOT", {
             "TIME_SLOT_ID": ts_start_id,
             "TIME_VALUE": str(int(item['start_frame_timestamp'] * 1000))
@@ -125,8 +125,8 @@ def generate_eaf(merged_labels, output_file, video_path=""):
         alignable_annotation = ET.SubElement(annotation, "ALIGNABLE_ANNOTATION", {
             "ANNOTATION_ID": f"a{idx + 1}",
             "CVE_REF": label_to_cveid.get(item['label'], "unknown_cveid"),
-            "TIME_SLOT_REF1": time_slot_map[timestamp_to_index(item['start_frame_timestamp'])],
-            "TIME_SLOT_REF2": time_slot_map[timestamp_to_index(item['end_frame_timestamp'])-1000//25]
+            "TIME_SLOT_REF1": time_slot_map[timestamp_to_index(item['start_frame_timestamp'], fps)],
+            "TIME_SLOT_REF2": time_slot_map[timestamp_to_index(item['end_frame_timestamp'], fps)-1000//fps]
         })
         ET.SubElement(alignable_annotation, "ANNOTATION_VALUE").text = item['label']
 
@@ -178,6 +178,7 @@ def predict_and_save_video(video_path: str, output_path: str, output_resolution=
     result = []
     # Load the video
     video_handler = decord.VideoReader(video_path, num_threads=1)
+    fps = int(video_handler.get_avg_fps())
     # Iterate over frame with a context window
     last_possible_frame = len(video_handler) - data_config['context_size'] + 1
     with torch.no_grad():
@@ -205,7 +206,7 @@ def predict_and_save_video(video_path: str, output_path: str, output_resolution=
 
     merged_labels = merge_labels(result)
     video_basename = os.path.splitext(os.path.basename(video_path))[0]
-    generate_eaf(merged_labels, os.path.join(output_path, video_basename + '.eaf'), video_path=video_path)
+    generate_eaf(merged_labels, os.path.join(output_path, video_basename + '.eaf'), video_path=video_path, fps=fps)
 
 
 if __name__ == "__main__":

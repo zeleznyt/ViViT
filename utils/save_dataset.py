@@ -36,7 +36,7 @@ def save_dataset(data_config, dataset_split='train', output_path='dataset/', bal
                                      load_from_json=None,
                                      frame_sample_rate=data_config['frame_sample_rate'],
                                      context_size=data_config['context_size'],
-                                     overlap=data_config['context_size'],
+                                     overlap=data_config['overlap'],
                                      max_empty_frames=data_config['max_empty_frames'],
                                      num_threads=data_config['decord_num_threads'],
                                      normalize=data_config['normalize'],)

@@ -24,15 +24,14 @@ class ViViTpredictor():
         model_config['num_classes'] = num_classes
 
         print('Loading model...')
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = ViViT(model_config).to(device)
+        self.model = ViViT(model_config).to(self.device)
         # Move non-trainable mask to the device
-        self.model.temporal_transformer.cls_mask = self.model.temporal_transformer.cls_mask.to(device)
+        self.model.temporal_transformer.cls_mask = self.model.temporal_transformer.cls_mask.to(self.device)
 
         # Load the model
-        checkpoint = torch.load(checkpoint_path, weights_only=True, map_location=torch.device(device))
+        checkpoint = torch.load(checkpoint_path, weights_only=True, map_location=torch.device(self.device))
         self.model.load_state_dict(checkpoint['model_state_dict'])
-        print(f'Model loaded on {device} device.')
+        print(f'Model loaded on {self.device} device.')
 
     def predict(self, video: list) -> int:
         """
@@ -48,7 +47,7 @@ class ViViTpredictor():
         processed_video = processed_video.unsqueeze(0)
 
         prediction = self.model(processed_video,
-                           padding_mask=torch.tensor([False] * processed_video.shape[1]).unsqueeze(0).cuda())
+                           padding_mask=torch.tensor([False] * processed_video.shape[1]).unsqueeze(0).to(self.device))
         predicted_class = prediction.argmax(dim=1)
         return predicted_class
 

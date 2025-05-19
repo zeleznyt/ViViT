@@ -30,9 +30,9 @@ class ViViTpredictor():
         self.model.temporal_transformer.cls_mask = self.model.temporal_transformer.cls_mask.to(device)
 
         # Load the model
-        checkpoint = torch.load(checkpoint_path, weights_only=True)
+        checkpoint = torch.load(checkpoint_path, weights_only=True, map_location=torch.device(device))
         self.model.load_state_dict(checkpoint['model_state_dict'])
-        print('Model loaded.')
+        print(f'Model loaded on {device} device.')
 
     def predict(self, video: list) -> int:
         """

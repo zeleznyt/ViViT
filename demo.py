@@ -180,10 +180,10 @@ def predict_and_save_video(video_path: str, output_path: str, output_resolution=
     video_handler = decord.VideoReader(video_path, num_threads=1)
     fps = int(video_handler.get_avg_fps())
     # Iterate over frame with a context window
-    last_possible_frame = len(video_handler) - data_config['context_size'] + 1
+    last_possible_frame = len(video_handler) - ((data_config['context_size']) * fps)
     with torch.no_grad():
-        for i in tqdm.tqdm(range(data_config['context_size'], last_possible_frame, output_resolution)):
-            indexes = list(range(i - data_config['context_size'], i + data_config['context_size'] + 1))
+        for i in tqdm.tqdm(range(data_config['context_size'] * fps, last_possible_frame, output_resolution)):
+            indexes = list(range(i - (data_config['context_size'] * fps), i + (data_config['context_size'] * fps) + 1, fps))
             video = list(video_handler.get_batch(indexes).asnumpy())
             processed_video = preprocess_video(video, normalize=True)
             processed_video = rearrange(np.stack(processed_video), 't h w c -> t c h w')

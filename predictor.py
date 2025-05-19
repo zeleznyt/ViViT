@@ -4,6 +4,7 @@ import torch
 from einops import rearrange
 import numpy as np
 import time
+from utils.train_utils import *
 
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
@@ -61,23 +62,11 @@ class ViViTpredictor():
 
 
 if __name__ == '__main__':
-    model_config = {
-        'patch_size': 16,
-        'tubelet_size': 1,
-        'embed_dim': 768,
-        'spatial_num_heads': 12,
-        'spatial_num_layers': 12,
-        'spatial_mlp_dim': 2048,
-        'temporal_num_heads': 12,
-        'temporal_num_layers': 12,
-        'temporal_mlp_dim': 2048,
-        'num_classes': 8,
-        'max_seq_length': 17,
-        'image_size': 224,
-        'use_pretrained_encoder': 'vit',
-        'freeze_spatial_encoder': True,
-    }
-    checkpoint_path = '/media/zeleznyt/DATA/repo/ViViT/checkpoints/0021-ViViT-B_16x1-2025-05-06T17-54-54/model_12-15.pth'
+    # Process args and config
+    args = parse_args()
+    config = load_config(args.config)
+    model_config = config['model']
+    checkpoint_path = config['evaluation']['checkpoint']
     predictor = ViViTpredictor(model_config, checkpoint_path)
     input_video = [np.random.rand(240, 426, 3) for _ in range(17)] # List of ndarrays
     start_time = time.time()

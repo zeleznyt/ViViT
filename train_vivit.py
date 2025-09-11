@@ -489,7 +489,12 @@ if __name__ == "__main__":
             label_smoothing = train_config['label_smoothing']
         else:
             label_smoothing = 0.0
-        criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+        if data_config['class_weights']:
+            cls_weights = get_class_weights(data_config, CLASSES)
+            cls_weights = torch.tensor(cls_weights, dtype=torch.float32).to(device)
+        else:
+            cls_weights = None
+        criterion = nn.CrossEntropyLoss(weight=cls_weights, label_smoothing=label_smoothing)
     elif train_config['loss'] == 'seesaw':
         from utils.seesaw_loss import SeesawLossWithLogits
         # class_counts = defaultdict(int)

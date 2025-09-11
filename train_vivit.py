@@ -426,8 +426,6 @@ if __name__ == "__main__":
     # Move model to device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    # Move non-trainable mask to the device
-    model.temporal_transformer.cls_mask = model.temporal_transformer.cls_mask.to(device)
     if model_config.get('freeze_spatial_encoder'):
         for param in model.spatial_transformer.parameters():
             param.requires_grad = False

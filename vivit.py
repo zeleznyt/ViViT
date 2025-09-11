@@ -27,7 +27,7 @@ class SpatialTransformer(nn.Module):
             stride=(tubelet_size, patch_size, patch_size)
         )
 
-        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # TODO: randn vs zeros
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # randn like ViT/BERT
 
         seq_length = (image_size // patch_size) ** 2
         seq_length += 1  # For cls token
@@ -112,21 +112,16 @@ class TemporalTransformer(nn.Module):
                                                    batch_first=True)
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
-        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # TODO: randn vs zeros
-        self.cls_mask = torch.zeros(1, dtype=torch.bool)
-        # TODO: what to use for positional embedding
-        # self.pos_embed = nn.Parameter(
-        #     torch.zeros(1, 100, embed_dim))  # Adjust the 100 according to your max sequence length
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # randn like ViT/BERT
         self.pos_embed = nn.Parameter(torch.empty(1, seq_length + 1, embed_dim).normal_(std=0.02))  # from BERT
         self.norm_layer = nn.LayerNorm(embed_dim)
 
     def forward(self, x, padding_mask=None):
         b, t, n = x.shape
-
         # Add temporal CLS token
         cls_token = repeat(self.cls_token, '() t n -> b t n', b=b)
         x = torch.cat((cls_token, x), dim=1)
-        cls_mask = repeat(self.cls_mask.unsqueeze(dim=0), '() t -> b t', b=b)
+        cls_mask = torch.zeros(b, 1, dtype=torch.bool, device=padding_mask.device)  # always zeros (token never masked)
         padding_mask = torch.cat((cls_mask, padding_mask), dim=1)
 
         # Add positional encoding

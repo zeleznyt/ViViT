@@ -178,6 +178,8 @@ def visualize_frame(image, label=None):
 
 
 def visualize_frames(video, label=None):
+    if type(video) is torch.Tensor and video.mean() > 1.0:  # Only when video is Tensor and is scaled 0-255 (rather than real values)
+        video = video.int()
     fig, axes = plt.subplots(4, 4, figsize=(8, 8))
     for i, ax in enumerate(axes.flat):
         if i >= len(video):

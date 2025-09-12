@@ -227,7 +227,7 @@ class VideoDataset(Dataset):
         indices = self.data[index][1]
         video_path = self.data[index][0]
         decord_vr = decord.VideoReader(video_path, num_threads=self.num_threads)
-        video = list(decord_vr.get_batch(indices).asnumpy())
+        video = decord_vr.get_batch(indices).asnumpy()
 
         pad_len = self.max_sequence_length - len(video)
         video_padded = np.pad(video, ((0, pad_len), (0, 0), (0, 0), (0, 0)), 'constant', constant_values=-1)

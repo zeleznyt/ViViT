@@ -228,10 +228,12 @@ class VideoDataset(Dataset):
         video_path = self.data[index][0]
         decord_vr = decord.VideoReader(video_path, num_threads=self.num_threads)
         video = decord_vr.get_batch(indices).asnumpy()
+        seq_len = video.shape[0]
 
-        pad_len = self.max_sequence_length - len(video)
-        video_padded = np.pad(video, ((0, pad_len), (0, 0), (0, 0), (0, 0)), 'constant', constant_values=-1)
+        video_padded = np.full((self.max_sequence_length, *video.shape[1:]), fill_value=-1, dtype=video.dtype)
+        video_padded[:len(video)] = video
 
+        pad_len = self.max_sequence_length - seq_len
         padding_mask = [False] * len(video) + [True] * pad_len
 
         video_padded = preprocess_video(video_padded, normalize=self.normalize)

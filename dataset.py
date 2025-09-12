@@ -5,6 +5,7 @@ import os
 import json
 import cv2
 from torch.utils.data import Dataset, DataLoader
+import torch
 import decord
 import matplotlib.pyplot as plt
 
@@ -88,6 +89,40 @@ def resize_with_padding(image, target_size=(224, 224)):
     return padded_image
 
 
+def resize_video_with_padding(video: np.ndarray, target_size=(224,224), pad_value=(123, 117, 104)):
+    """
+    Resize video frames with padding (letterbox style).
+    video: np.ndarray (T,H,W,C), dtype=uint8
+    Returns: torch.Tensor (T,target_H,target_W,C), float32
+    """
+    T, H, W, C = video.shape
+    target_h, target_w = target_size
+
+    # Convert to torch (T,C,H,W)
+    video_t = torch.from_numpy(video).permute(0,3,1,2).float()
+
+    # Compute scale (preserve aspect ratio)
+    scale = min(target_w / W, target_h / H)
+    new_w, new_h = int(W * scale), int(H * scale)
+
+    # Resize
+    resized = torch.nn.functional.interpolate(video_t, size=(new_h, new_w), mode="bilinear", align_corners=False)
+
+    # Make padded canvas
+    pad_tensor = torch.tensor(pad_value, dtype=torch.float32).view(1,C,1,1)
+    out = pad_tensor.expand(T, C, target_h, target_w).clone()
+
+    # Compute placement (centered)
+    y_offset = (target_h - new_h) // 2
+    x_offset = (target_w - new_w) // 2
+
+    # Paste resized frames into canvas
+    out[:, :, y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
+
+    # Back to (T,H,W,C)
+    return out.permute(0,2,3,1)
+
+
 def normalize_image(image):
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
@@ -95,6 +130,15 @@ def normalize_image(image):
     image = image.astype(np.float32) / 255.0
     image = (image - mean) / std
     return image
+
+
+def normalize_video(video: torch.Tensor) -> np.ndarray:
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+    video = video.float() / 255.0
+    video = (video - mean) / std   # broadcasting (T,H,W,C) - (C,)
+    return video
 
 
 def preprocess_image(image, target_size=(224, 224), normalize=False):
@@ -109,11 +153,20 @@ def preprocess_image(image, target_size=(224, 224), normalize=False):
     return image
 
 
-def preprocess_video(video, normalize=False):
-    result = []
-    for image in video:
-        result.append(preprocess_image(image, normalize=normalize))
-    return result
+# def preprocess_video(video, normalize=False):
+#     result = []
+#     for image in video:
+#         result.append(preprocess_image(image, normalize=normalize))
+#     return result
+
+
+def preprocess_video(video: np.ndarray, target_size=(224, 224), normalize=False, pad_value=(123, 117, 104)):
+    video = resize_video_with_padding(video, target_size, pad_value)  # (T,H,W,C), float32
+
+    if normalize:
+        video = normalize_video(video)
+
+    return video
 
 
 def visualize_frame(image, label=None):
@@ -236,8 +289,7 @@ class VideoDataset(Dataset):
         pad_len = self.max_sequence_length - seq_len
         padding_mask = [False] * len(video) + [True] * pad_len
 
-        video_padded = preprocess_video(video_padded, normalize=self.normalize)
-        x = np.stack(video_padded)
+        x = preprocess_video(video_padded, normalize=self.normalize)
         y = self.data[index][2]
 
         return x, y, np.array(padding_mask)

@@ -11,7 +11,7 @@ model:
   num_classes: 8
   max_seq_length: 16
   image_size: 224
-  use_vit: False  # To use ViT encoder with Conv2d instead of tubelet with Conv3d. ViT is automatically pretrained on Imagenet.
+  use_pretrained_encoder: vit  # [none, vit, resnet] To use ViT encoder with Conv2d instead of tubelet with Conv3d. ViT is automatically pretrained on Imagenet.
   freeze_spatial_encoder: True
 
 data:
@@ -36,7 +36,10 @@ data:
   batch_size: 2
   num_workers: 0
   decord_num_threads: 2
+  max_train_readers: 4
+  max_val_readers: 4
   normalize: False
+  class_weights: True
 
 training:
   model_name: ViVit-B
@@ -47,6 +50,7 @@ training:
   optimizer: sgd  # ["adam, sgd"]
   loss: seesaw # [crossentropy, seesaw]
   label_smoothing: 0.2 # Only for crossentropy loss
+  gradient_accumulation_steps: 1
   epochs: 50
   log_step: 50
   eval_step: 50

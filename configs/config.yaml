@@ -15,9 +15,12 @@ model:
   freeze_spatial_encoder: True
 
 data:
-  batch_size: 2
-  min_sequence_length: 2
-  max_sequence_length: 16
+  dataset_type: stream  # [one_class, stream]
+  min_sequence_length: 2  # for one_class only
+  max_sequence_length: 16  # for one_class only
+  context_size: 8  # for stream only
+  overlap: 2  # for stream only
+  max_empty_frames: 3  # for stream only
   frame_sample_rate: 1
   num_channels: 3
   height: 224
@@ -25,11 +28,18 @@ data:
   train_meta_file: example_data_RAVDAI/annotations.json
   val_meta_file: example_data_RAVDAI/annotations.json
   test_meta_file: example_data_RAVDAI/annotations.json
+  train_json: none
+  val_json: none
+  test_json: none
   shuffle: True
   drop_last: True
+  batch_size: 2
   num_workers: 0
   decord_num_threads: 2
+  max_train_readers: 4
+  max_val_readers: 4
   normalize: False
+  class_weights: True
 
 training:
   model_name: ViVit-B
@@ -45,7 +55,9 @@ training:
   log_step: 50
   eval_step: 50
   save_step: 50
-  checkpoint_save_dir: /media/zeleznyt/DATA/repo/ViViT/checkpoints
+  checkpoint_save_dir: /media/zeleznyt/DATA/repo/ViViT/checkpoints/
+  load_from_checkpoint: none
+  load_only_weights: False
   report_to: wandb  # ["wandb", None]
   balance_dataset: False  # Randomly sample dataset so every class has the same number of instances
 

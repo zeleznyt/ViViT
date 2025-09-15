@@ -528,7 +528,7 @@ if __name__ == "__main__":
         print('Dataset "{}" successfully balanced in {} seconds.'.format(data_config['dataset_type'], end - start))
     print('Dataset length: {}'.format(len(train_dataset)))
 
-    train_sampler = GroupedVideoSampler(data=train_dataset.data, videos_per_group=data_config['max_train_readers'], shuffle=True)
+    train_sampler = GroupedVideoSampler(data=train_dataset.data, videos_per_group=data_config['max_train_readers'], shuffle=data_config['shuffle'])
     train_dataloader = DataLoader(train_dataset, batch_size=data_config['batch_size'], sampler=train_sampler,
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'],
                                   prefetch_factor=data_config['prefetch_factor'])

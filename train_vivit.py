@@ -3,14 +3,13 @@ import torch
 import json
 from torch import nn
 from einops import rearrange
-from torch.utils.data import Dataset, DataLoader
 from vivit import ViViT
 from dataset import VideoDataset, VideoStreamDataset
 import time
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import random
-from torch.utils.data import Subset
+from torch.utils.data import Subset, Sampler, Dataset, DataLoader
 from utils.train_utils import *
 from tqdm import tqdm
 from datetime import datetime
@@ -385,6 +384,55 @@ def set_seed(seed_value=42):
     torch.backends.cudnn.deterministic = True
 
 
+class GroupedVideoSampler(Sampler):
+    def __init__(self, data, videos_per_group=4, shuffle=True):
+        """
+        Args:
+            data: list of samples, each like [video_path, indices, label]
+            videos_per_group: how many videos to load into cache at once
+            shuffle: shuffle videos and samples each epoch
+        """
+        self.data = data
+        self.videos_per_group = videos_per_group
+        self.shuffle = shuffle
+
+        # Group dataset indices by video
+        self.video_to_indices = {}
+        for idx, item in enumerate(data):
+            video_path = item[0]
+            if video_path not in self.video_to_indices:
+                self.video_to_indices[video_path] = []
+            self.video_to_indices[video_path].append(idx)
+
+        self.videos = list(self.video_to_indices.keys())
+
+    def __iter__(self):
+        videos = self.videos[:]
+        if self.shuffle:
+            random.shuffle(videos)
+
+        # Go through groups of N videos
+        for i in range(0, len(videos), self.videos_per_group):
+            group = videos[i:i+self.videos_per_group]
+
+            group_indices = []
+            for v in group:
+                idxs = self.video_to_indices[v]
+                if self.shuffle:
+                    random.shuffle(idxs)
+                group_indices.extend(idxs)
+
+            # Optionally shuffle across videos inside the group
+            if self.shuffle:
+                random.shuffle(group_indices)
+
+            for idx in group_indices:
+                yield idx
+
+    def __len__(self):
+        return len(self.data)
+
+
 if __name__ == "__main__":
     # Process args and config
     args = parse_args()
@@ -479,7 +527,9 @@ if __name__ == "__main__":
         end = time.time()
         print('Dataset "{}" successfully balanced in {} seconds.'.format(data_config['dataset_type'], end - start))
     print('Dataset length: {}'.format(len(train_dataset)))
-    train_dataloader = DataLoader(train_dataset, batch_size=data_config['batch_size'], shuffle=data_config['shuffle'],
+
+    train_sampler = GroupedVideoSampler(data=train_dataset.data, videos_per_group=data_config['max_train_readers'], shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=data_config['batch_size'], sampler=train_sampler,
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
     val_dataloader = DataLoader(val_dataset, batch_size=data_config['batch_size'], shuffle=False,
                                   drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])

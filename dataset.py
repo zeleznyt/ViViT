@@ -406,3 +406,7 @@ class VideoStreamDataset(VideoDataset):
 
                     self.data.append([annotation_file['video'], indexes, self.classes.index(label)])
                     mid_frame += (self.context_size * 2 + 1 - self.overlap) * sampling
+
+    @property
+    def raw_data(self):
+        return self.data

@@ -40,6 +40,7 @@ data:
   max_val_readers: 4
   normalize: False
   class_weights: True
+  prefetch_factor: 4
 
 training:
   model_name: ViVit-B

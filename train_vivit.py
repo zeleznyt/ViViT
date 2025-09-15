@@ -530,9 +530,11 @@ if __name__ == "__main__":
 
     train_sampler = GroupedVideoSampler(data=train_dataset.data, videos_per_group=data_config['max_train_readers'], shuffle=True)
     train_dataloader = DataLoader(train_dataset, batch_size=data_config['batch_size'], sampler=train_sampler,
-                                  drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
+                                  drop_last=data_config['drop_last'], num_workers=data_config['num_workers'],
+                                  prefetch_factor=data_config['prefetch_factor'])
     val_dataloader = DataLoader(val_dataset, batch_size=data_config['batch_size'], shuffle=False,
-                                  drop_last=data_config['drop_last'], num_workers=data_config['num_workers'])
+                                drop_last=data_config['drop_last'], num_workers=data_config['num_workers'],
+                                prefetch_factor=data_config['prefetch_factor'])
 
 
     # Set Loss, optimizer and scheduler

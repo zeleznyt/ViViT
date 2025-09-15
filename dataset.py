@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch
 import decord
 import matplotlib.pyplot as plt
-
+from collections import OrderedDict
 
 
 def read_video_pyav(container, indices):
@@ -206,9 +206,29 @@ def get_label_on_idx(frame_idx, annotation_list):
         return -1
 
 
+class VideoReaderCache:
+    def __init__(self, max_readers=4, num_threads=2):
+        self.cache = OrderedDict()
+        self.max_readers = max_readers
+        self.num_threads = num_threads
+
+    def get_reader(self, video_path):
+        if video_path in self.cache:
+            self.cache.move_to_end(video_path)
+            return self.cache[video_path]
+
+        # Remove the oldest if cache full
+        if len(self.cache) >= self.max_readers:
+            self.cache.popitem(last=False)
+
+        vr = decord.VideoReader(video_path, num_threads=self.num_threads)
+        self.cache[video_path] = vr
+        return vr
+
+
 class VideoDataset(Dataset):
     def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, min_sequence_length=2,
-                 max_sequence_length=16, input_fps=25, step=1000, num_threads=0, normalize=False):
+                 max_sequence_length=16, input_fps=25, step=1000, num_threads=0, max_readers=4, normalize=False):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -234,6 +254,7 @@ class VideoDataset(Dataset):
         self.step = step
         self.normalize = normalize
         sampling = self.input_fps * self.frame_sample_rate
+        self.vr_cache = VideoReaderCache(max_readers=max_readers, num_threads=self.num_threads)
 
         video_list = []
         self.meta_data = []
@@ -281,7 +302,7 @@ class VideoDataset(Dataset):
         """
         indices = self.data[index][1]
         video_path = self.data[index][0]
-        decord_vr = decord.VideoReader(video_path, num_threads=self.num_threads)
+        decord_vr = self.vr_cache.get_reader(video_path)
         video = decord_vr.get_batch(indices).asnumpy()
         seq_len = video.shape[0]
 
@@ -315,7 +336,7 @@ class VideoDataset(Dataset):
 
 class VideoStreamDataset(VideoDataset):
     def __init__(self, meta_file, classes, load_from_json=None, frame_sample_rate=1, context_size=8, overlap=2,
-                 max_empty_frames=3, input_fps=25, step=1000, num_threads=0, normalize=False):
+                 max_empty_frames=3, input_fps=25, step=1000, num_threads=0, max_readers=4, normalize=False):
         """
         Args:
             meta_file (`str`): Path to the metafile containing paths to video and annotation files
@@ -347,6 +368,7 @@ class VideoStreamDataset(VideoDataset):
         self.max_sequence_length = 2 * context_size + 1
         self.normalize = normalize
         sampling = self.input_fps * self.frame_sample_rate
+        self.vr_cache = VideoReaderCache(max_readers=max_readers, num_threads=self.num_threads)
 
         video_list = []
         self.meta_data = []

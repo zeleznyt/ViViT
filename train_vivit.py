@@ -458,6 +458,7 @@ if __name__ == "__main__":
                                      overlap=data_config['overlap'],
                                      max_empty_frames=data_config['max_empty_frames'],
                                      num_threads=data_config['decord_num_threads'],
+                                     max_readers=data_config['max_readers'],
                                      normalize=data_config['normalize'],)
         val_dataset = VideoStreamDataset(data_config['val_meta_file'], CLASSES,
                                      load_from_json=data_config['val_json'],
@@ -466,6 +467,7 @@ if __name__ == "__main__":
                                      overlap=data_config['overlap'],
                                      max_empty_frames=data_config['max_empty_frames'],
                                      num_threads=data_config['decord_num_threads'],
+                                     max_readers=data_config['max_readers'],
                                      normalize=data_config['normalize'],)
 
     end = time.time()

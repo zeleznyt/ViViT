@@ -46,7 +46,7 @@ def get_class_weights(data_config, classes):
         with open(train_data_path) as f:
             data = json.load(f)
         # Extract labels
-        labels = [item['label'] for item in data]
+        labels = [item[2] for item in data]
         # Count occurrences
         counts = Counter(labels)
     else:

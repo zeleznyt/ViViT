@@ -41,7 +41,8 @@ def get_class_weights(data_config, classes):
     :param data_config: data config
     :return: weights for each class
     """
-    train_data_path = data_config['train_json']
+    # train_data_path = data_config['train_json']
+    train_data_path = '/home/zeleznyt/Downloads/train_data.json'
     if train_data_path and os.path.exists(train_data_path):
         with open(train_data_path) as f:
             data = json.load(f)
@@ -49,6 +50,7 @@ def get_class_weights(data_config, classes):
         labels = [item[2] for item in data]
         # Count occurrences
         counts = Counter(labels)
+        counts = {classes[k]: v for k, v in counts.items()}
     else:
         print('No train json file {}. Using default values.'.format(train_data_path))
         counts = {'indoor': 68666,

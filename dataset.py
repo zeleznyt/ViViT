@@ -306,7 +306,7 @@ class VideoDataset(Dataset):
         video = decord_vr.get_batch(indices).asnumpy()
         seq_len = video.shape[0]
 
-        video_padded = np.full((self.max_sequence_length, *video.shape[1:]), fill_value=-1, dtype=video.dtype)
+        video_padded = np.full((self.max_sequence_length, *video.shape[1:]), fill_value=0, dtype=video.dtype)
         video_padded[:len(video)] = video
 
         pad_len = self.max_sequence_length - seq_len

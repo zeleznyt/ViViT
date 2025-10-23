@@ -1,7 +1,7 @@
 import time
 import random
 import numpy as np
-import decord
+import torch
 from dataset import VideoDataset, VideoStreamDataset, preprocess_video
 from utils.train_utils import *
 from train_vivit import create_balanced_subset
@@ -10,7 +10,7 @@ from tqdm import tqdm
 from torchvision.models import vit_b_16
 from einops import rearrange, repeat
 import torch.nn as nn
-import torch
+import decord
 
 CLASSES = ['studio', 'indoor', 'outdoor', 'předěl', 'reklama', 'upoutávka', 'grafika', 'zábava']
 
@@ -124,9 +124,11 @@ if __name__ == "__main__":
     # save_dataset(data_config=data_config, dataset_split='train', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])
     # save_dataset(data_config=data_config, dataset_split='val', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])
     # save_dataset(data_config=data_config, dataset_split='test', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])
-    data_dir = "/storage/plzen4-ntis/projects/korpusy_cv/RAVDAI/data-240p/"
+    data_dir = "/media/zeleznyt/DATA/repo/ViViT/example_data_RAVDAI/"
+    # data_dir = "/storage/plzen4-ntis/projects/korpusy_cv/RAVDAI/data-240p/"
     encoder = vit_b_16(weights='ViT_B_16_Weights.DEFAULT')
     encoder.heads = nn.Identity()
-    save_embeddings_to_h5(data_dir, "/storage/plzen4-ntis/projects/korpusy_cv/RAVDAI/embeddings.h5", encoder, 224, 2, normalize=data_config['normalize'])
-
+    # save_embeddings_to_h5(data_dir, "/storage/plzen4-ntis/projects/korpusy_cv/RAVDAI/embeddings.h5", encoder, 224, 2, normalize=data_config['normalize'])
+    save_embeddings_to_h5(data_dir, "/media/zeleznyt/DATA/repo/ViViT/example_data_RAVDAI/embeddings.h5", encoder, batch_size=16,
+                          step=25, normalize=data_config['normalize'])
 

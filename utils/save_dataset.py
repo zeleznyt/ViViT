@@ -88,7 +88,7 @@ def save_embeddings_to_h5(data_dir, output_file, encoder, batch_size=16, step=25
     video_list = [os.path.join(data_dir, v) for v in os.listdir(data_dir) if v.lower().endswith('.mp4')]
     print(f"Found {len(video_list)} unique videos.")
 
-    with h5py.File(output_file, 'w') as h5f:
+    with h5py.File(output_file, 'a') as h5f:
         for video_path in tqdm(video_list, desc="Saving embeddings"):
             video_name = os.path.splitext(os.path.basename(video_path))[0]
             # Skip if already processed

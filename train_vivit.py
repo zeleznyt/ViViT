@@ -433,7 +433,7 @@ class GroupedVideoSampler(Sampler):
 def create_datasets(dataset_type: str, **kwargs):
     data_config = kwargs['data_config']
     classes = kwargs['classes']
-    if data_config['dataset_type'] == 'one_class':
+    if dataset_type == 'one_class':
         train_dataset = VideoDataset(data_config['train_meta_file'], classes,
                                load_from_json=data_config['train_json'],
                                frame_sample_rate=data_config['frame_sample_rate'],
@@ -448,7 +448,7 @@ def create_datasets(dataset_type: str, **kwargs):
                                max_sequence_length=data_config['max_sequence_length'],
                                num_threads=data_config['decord_num_threads'],
                                normalize=data_config['normalize'],)
-    elif data_config['dataset_type'] == 'stream':
+    elif dataset_type == 'stream':
         train_dataset = VideoStreamDataset(data_config['train_meta_file'], classes,
                                      load_from_json=data_config['train_json'],
                                      frame_sample_rate=data_config['frame_sample_rate'],

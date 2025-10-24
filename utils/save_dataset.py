@@ -91,7 +91,16 @@ def save_embeddings_to_h5(data_dir, output_file, encoder, batch_size=16, step=25
     with h5py.File(output_file, 'w') as h5f:
         for video_path in tqdm(video_list, desc="Saving embeddings"):
             video_name = os.path.splitext(os.path.basename(video_path))[0]
-            vr = decord.VideoReader(video_path, num_threads=4)
+            # Skip if already processed
+            if video_name in h5f:
+                continue
+
+            try:
+                vr = decord.VideoReader(video_path, num_threads=4)
+            except Exception as e:
+                print(f"[WARN] Skipping {video_path}: {e}")
+                continue  # skip this file
+
             num_frames = len(vr)
 
             grp = h5f.create_group(video_name)
@@ -124,11 +133,10 @@ if __name__ == "__main__":
     # save_dataset(data_config=data_config, dataset_split='train', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])
     # save_dataset(data_config=data_config, dataset_split='val', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])
     # save_dataset(data_config=data_config, dataset_split='test', output_path='dataset_split/', balanced_dataset=config['training']['balance_dataset'])
-    data_dir = "/media/zeleznyt/DATA/repo/ViViT/example_data_RAVDAI/"
-    # data_dir = "/storage/plzen4-ntis/projects/korpusy_cv/RAVDAI/data-240p/"
+    # data_dir = "/media/zeleznyt/DATA/repo/ViViT/example_data_RAVDAI/"
+    data_dir = "/storage/plzen4-ntis/projects/korpusy_cv/RAVDAI/data-240p/"
     encoder = vit_b_16(weights='ViT_B_16_Weights.DEFAULT')
     encoder.heads = nn.Identity()
-    # save_embeddings_to_h5(data_dir, "/storage/plzen4-ntis/projects/korpusy_cv/RAVDAI/embeddings.h5", encoder, 224, 2, normalize=data_config['normalize'])
-    save_embeddings_to_h5(data_dir, "/media/zeleznyt/DATA/repo/ViViT/example_data_RAVDAI/embeddings.h5", encoder, batch_size=16,
-                          step=25, normalize=data_config['normalize'])
+    # save_embeddings_to_h5(data_dir, "/media/zeleznyt/DATA/repo/ViViT/example_data_RAVDAI/embeddings.h5", encoder, batch_size=16, step=25, normalize=data_config['normalize'])
+    save_embeddings_to_h5(data_dir, "/storage/plzen4-ntis/projects/korpusy_cv/RAVDAI/embeddings.h5", encoder, batch_size=16, step=25, normalize=data_config['normalize'])
 

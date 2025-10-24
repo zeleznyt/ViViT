@@ -107,10 +107,8 @@ def evaluate(model, data_loader, loss_func, device):
             # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
 
             # Preprocess data and target
-            x = data.to(device)
-            padding_mask = padding_mask.to(device)
+            x, target, padding_mask = [t.to(device) for t in (data, target, padding_mask)]
             data = rearrange(x, 'b p h w c -> b p c h w')
-            target = target.type(torch.LongTensor).to(device)
 
             # Model predictions
             pred = model(data.float(), padding_mask)
@@ -180,10 +178,9 @@ def train_epoch(epoch, model, optimizer, lr_sched, gradient_accumulation_steps, 
         # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
         if i % gradient_accumulation_steps == 0:
             optimizer.zero_grad()
-        x = data.to(device)
-        padding_mask = padding_mask.to(device)
+
+        x, target, padding_mask = [t.to(device) for t in (data, target, padding_mask)]
         data = rearrange(x, 'b p h w c -> b p c h w')
-        target = target.type(torch.LongTensor).to(device)
 
         pred = model(data.float(), padding_mask)
 
@@ -433,6 +430,46 @@ class GroupedVideoSampler(Sampler):
         return len(self.data)
 
 
+def create_datasets(dataset_type: str, **kwargs):
+    data_config = kwargs['data_config']
+    classes = kwargs['classes']
+    if data_config['dataset_type'] == 'one_class':
+        train_dataset = VideoDataset(data_config['train_meta_file'], classes,
+                               load_from_json=data_config['train_json'],
+                               frame_sample_rate=data_config['frame_sample_rate'],
+                               min_sequence_length=data_config['min_sequence_length'],
+                               max_sequence_length=data_config['max_sequence_length'],
+                               num_threads=data_config['decord_num_threads'],
+                               normalize=data_config['normalize'],)
+        val_dataset = VideoDataset(data_config['val_meta_file'], classes,
+                               load_from_json=data_config['val_json'],
+                               frame_sample_rate=data_config['frame_sample_rate'],
+                               min_sequence_length=data_config['min_sequence_length'],
+                               max_sequence_length=data_config['max_sequence_length'],
+                               num_threads=data_config['decord_num_threads'],
+                               normalize=data_config['normalize'],)
+    elif data_config['dataset_type'] == 'stream':
+        train_dataset = VideoStreamDataset(data_config['train_meta_file'], classes,
+                                     load_from_json=data_config['train_json'],
+                                     frame_sample_rate=data_config['frame_sample_rate'],
+                                     context_size=data_config['context_size'],
+                                     overlap=data_config['overlap'],
+                                     max_empty_frames=data_config['max_empty_frames'],
+                                     num_threads=data_config['decord_num_threads'],
+                                     max_readers=data_config['max_train_readers'],
+                                     normalize=data_config['normalize'],)
+        val_dataset = VideoStreamDataset(data_config['val_meta_file'], classes,
+                                     load_from_json=data_config['val_json'],
+                                     frame_sample_rate=data_config['frame_sample_rate'],
+                                     context_size=data_config['context_size'],
+                                     overlap=data_config['overlap'],
+                                     max_empty_frames=data_config['max_empty_frames'],
+                                     num_threads=data_config['decord_num_threads'],
+                                     max_readers=1,
+                                     normalize=data_config['normalize'],)
+    return train_dataset, val_dataset
+
+
 if __name__ == "__main__":
     # Process args and config
     args = parse_args()
@@ -473,6 +510,7 @@ if __name__ == "__main__":
 
     # Move model to device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Using device: {}".format(device))
     model = model.to(device)
     if model_config.get('freeze_spatial_encoder'):
         for param in model.spatial_transformer.parameters():
@@ -483,40 +521,7 @@ if __name__ == "__main__":
     start = time.time()
     print('Loading dataset...')
     assert data_config['dataset_type'] in ['one_class', 'stream'], f'Dataset type {data_config["dataset_type"]} not supported'
-    if data_config['dataset_type'] == 'one_class':
-        train_dataset = VideoDataset(data_config['train_meta_file'], CLASSES,
-                               load_from_json=data_config['train_json'],
-                               frame_sample_rate=data_config['frame_sample_rate'],
-                               min_sequence_length=data_config['min_sequence_length'],
-                               max_sequence_length=data_config['max_sequence_length'],
-                               num_threads=data_config['decord_num_threads'],
-                               normalize=data_config['normalize'],)
-        val_dataset = VideoDataset(data_config['val_meta_file'], CLASSES,
-                               load_from_json=data_config['val_json'],
-                               frame_sample_rate=data_config['frame_sample_rate'],
-                               min_sequence_length=data_config['min_sequence_length'],
-                               max_sequence_length=data_config['max_sequence_length'],
-                               num_threads=data_config['decord_num_threads'],
-                               normalize=data_config['normalize'],)
-    elif data_config['dataset_type'] == 'stream':
-        train_dataset = VideoStreamDataset(data_config['train_meta_file'], CLASSES,
-                                     load_from_json=data_config['train_json'],
-                                     frame_sample_rate=data_config['frame_sample_rate'],
-                                     context_size=data_config['context_size'],
-                                     overlap=data_config['overlap'],
-                                     max_empty_frames=data_config['max_empty_frames'],
-                                     num_threads=data_config['decord_num_threads'],
-                                     max_readers=data_config['max_train_readers'],
-                                     normalize=data_config['normalize'],)
-        val_dataset = VideoStreamDataset(data_config['val_meta_file'], CLASSES,
-                                     load_from_json=data_config['val_json'],
-                                     frame_sample_rate=data_config['frame_sample_rate'],
-                                     context_size=data_config['context_size'],
-                                     overlap=data_config['overlap'],
-                                     max_empty_frames=data_config['max_empty_frames'],
-                                     num_threads=data_config['decord_num_threads'],
-                                     max_readers=data_config['max_val_readers'],
-                                     normalize=data_config['normalize'],)
+    train_dataset, val_dataset = create_datasets(data_config['dataset_type'], classes = CLASSES, data_config=data_config)
 
     end = time.time()
     print('Dataset "{}" successfully loaded in {} seconds.'.format(data_config['dataset_type'], end - start))

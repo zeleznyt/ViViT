@@ -207,6 +207,13 @@ def get_label_on_idx(frame_idx, annotation_list):
         return -1
 
 
+def get_video_length_opencv(video_path):
+    cap = cv2.VideoCapture(video_path)
+    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    return length
+
+
 class VideoReaderCache:
     def __init__(self, max_readers=4, num_threads=2):
         self.cache = OrderedDict()
@@ -390,7 +397,10 @@ class VideoStreamDataset(VideoDataset):
 
                 mid_frame = self.context_size * sampling
 
-                while (mid_frame + self.context_size * sampling) / self.input_fps * self.step <= annotation_list[-1][1]:
+                video_len = get_video_length_opencv(annotation_file['video'])
+                max_data_len = min(annotation_list[-1][1], video_len)
+
+                while (mid_frame + self.context_size * sampling) / self.input_fps * self.step <= max_data_len:
                     indexes = list(np.arange(mid_frame - (self.context_size * sampling),
                                          mid_frame + ((self.context_size +1) * sampling),
                                          sampling).astype(int))

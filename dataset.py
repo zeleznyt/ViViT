@@ -9,6 +9,7 @@ import torch
 import decord
 import matplotlib.pyplot as plt
 from collections import OrderedDict
+import h5py
 
 
 def read_video_pyav(container, indices):
@@ -410,3 +411,45 @@ class VideoStreamDataset(VideoDataset):
     @property
     def raw_data(self):
         return self.data
+
+
+class VideoStreamFromEmbeddings(Dataset):
+    def __init__(self, load_from_json, classes, embeddings_file, context_size=8):
+        assert embeddings_file.endswith('.h5')
+        assert os.path.exists(load_from_json)
+
+        print(f'Loading data from {load_from_json}')
+        with open(load_from_json, 'r') as f:
+            self.data = json.load(f)
+        self.classes = classes
+        self.embeddings_file = embeddings_file
+        self.h5_data = None
+        self.max_sequence_length = 2 * context_size + 1
+
+    def __getitem__(self, index):
+        if self.h5_data is None:
+            self.h5 = h5py.File(self.embeddings_file, 'r')
+        video_path, indices, y = self.data[index]
+        video_name = video_path.split('/')[-1]
+        video_name = os.path.splitext(video_name)[0]
+        # Load data from h5
+        frames_shape = self.h5[video_name][str(indices[0])].shape
+        data_np = np.empty((len(indices), *frames_shape), dtype=np.float32)
+        for i, idx in enumerate(indices):
+            data_np[i] = self.h5[video_name][str(idx)][()]
+
+        data = torch.from_numpy(data_np)
+        # Padding mask
+        seq_len = data.size(0)
+        pad_len = self.max_sequence_length - seq_len
+
+        # Create a boolean tensor for the padding mask
+        padding_mask = torch.cat([
+            torch.zeros(seq_len, dtype=torch.bool),
+            torch.ones(pad_len, dtype=torch.bool)
+        ])
+
+        return data, y, padding_mask
+
+    def __len__(self):
+        return len(self.data)

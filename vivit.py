@@ -105,73 +105,113 @@ class ResNetEmbedder(nn.Module):
         return x  # (b, t, embed_dim)
 
 
+# class TemporalTransformer(nn.Module):
+#     def __init__(self, embed_dim=768, num_heads=12, dim_feedforward=2048, num_layers=12, seq_length=16):
+#         super(TemporalTransformer, self).__init__()
+#         encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, dim_feedforward=dim_feedforward,
+#                                                    batch_first=True)
+#         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+#
+#         self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # randn like ViT/BERT
+#         self.pos_embed = nn.Parameter(torch.empty(1, seq_length + 1, embed_dim).normal_(std=0.02))  # from BERT
+#         self.norm_layer = nn.LayerNorm(embed_dim)
+#
+#     def forward(self, x, padding_mask=None):
+#         b, t, n = x.shape
+#         # Add temporal CLS token
+#         cls_token = repeat(self.cls_token, '() t n -> b t n', b=b)
+#         x = torch.cat((cls_token, x), dim=1)
+#         cls_mask = torch.zeros(b, 1, dtype=torch.bool, device=padding_mask.device)  # always zeros (token never masked)
+#         padding_mask = torch.cat((cls_mask, padding_mask), dim=1)
+#
+#         # Add positional encoding
+#         x += self.pos_embed[:, :t + 1]
+#
+#         x = self.encoder(x, src_key_padding_mask=padding_mask)
+#         x = self.norm_layer(x)
+#
+#         return x[:, 0]  # Return the class token (batch_size, embed_dim)
+
+
 class TemporalTransformer(nn.Module):
-    def __init__(self, embed_dim=768, num_heads=12, dim_feedforward=2048, num_layers=12, seq_length=16):
-        super(TemporalTransformer, self).__init__()
-        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, dim_feedforward=dim_feedforward,
-                                                   batch_first=True)
+    def __init__(self, embed_dim=768, num_heads=8, num_layers=2, dropout=0.1, seq_length=16):
+        super().__init__()
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=embed_dim,
+            nhead=num_heads,
+            dim_feedforward=embed_dim * 4,
+            dropout=dropout,
+            batch_first=True,
+            norm_first=True,  # improves stability
+            activation="gelu"
+        )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
-        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # randn like ViT/BERT
-        self.pos_embed = nn.Parameter(torch.empty(1, seq_length + 1, embed_dim).normal_(std=0.02))  # from BERT
-        self.norm_layer = nn.LayerNorm(embed_dim)
+        # CLS token and positional embedding
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim)) # TODO: zeros vs randn
+        nn.init.normal_(self.cls_token, std=0.02)
+
+        self.pos_embed = nn.Parameter(torch.zeros(1, seq_length + 1, embed_dim))
+        nn.init.normal_(self.pos_embed, std=0.02)
+
+        # self.norm = nn.LayerNorm(embed_dim)
 
     def forward(self, x, padding_mask=None):
-        b, t, n = x.shape
-        # Add temporal CLS token
-        cls_token = repeat(self.cls_token, '() t n -> b t n', b=b)
+        """
+        x: (B, T, D)
+        padding_mask: (B, T) bool (True where padded)
+        """
+        b, t, d = x.shape
+
+        cls_token = repeat(self.cls_token, '() n d -> b n d', b=b)
         x = torch.cat((cls_token, x), dim=1)
-        cls_mask = torch.zeros(b, 1, dtype=torch.bool, device=padding_mask.device)  # always zeros (token never masked)
-        padding_mask = torch.cat((cls_mask, padding_mask), dim=1)
+
+        if padding_mask is not None:
+            cls_mask = torch.zeros(b, 1, dtype=torch.bool, device=x.device)
+            padding_mask = torch.cat((cls_mask, padding_mask), dim=1)
 
         # Add positional encoding
-        x += self.pos_embed[:, :t + 1]
+        x = x + self.pos_embed[:, :t + 1]
 
+        # Forward through transformer
         x = self.encoder(x, src_key_padding_mask=padding_mask)
-        x = self.norm_layer(x)
+        # x = self.norm(x)
 
-        return x[:, 0]  # Return the class token (batch_size, embed_dim)
+        return x[:, 0]  # return CLS token
 
 
 class ViViT(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, use_only_embeddings=False):
         super(ViViT, self).__init__()
         self.config = config
-        # if config['use_vit']:
-        #     torch._assert(config['tubelet_size'] == 1, f"tubelet_size must be 1 when using use_vit==True!")
-        #     self.spatial_transformer = ViT()
-        # else:
-        #     self.spatial_transformer = SpatialTransformer(embed_dim=config['embed_dim'],
-        #                                                     num_heads=config['spatial_num_heads'],
-        #                                                     dim_feedforward=config['spatial_mlp_dim'],
-        #                                                     num_layers=config['spatial_num_layers'],
-        #                                                     patch_size=config['patch_size'],
-        #                                                     tubelet_size=config['tubelet_size'],
-        #                                                     image_size=config['image_size'])
-
-        if config.get('use_pretrained_encoder', False) == 'vit':
-            torch._assert(config['tubelet_size'] == 1, "tubelet_size must be 1 when using use_vit==True!")
+        self.use_only_embeddings = use_only_embeddings
+        if self.use_only_embeddings:
             self.spatial_transformer = ViT()
             embed_dim = 768
-        elif config.get('use_pretrained_encoder', False) == 'resnet':
-            torch._assert(config['tubelet_size'] == 1, "tubelet_size must be 1 when using use_resnet==True!")
-            self.spatial_transformer = ResNetEmbedder()
-            embed_dim = self.spatial_transformer.embed_dim
         else:
-            self.spatial_transformer = SpatialTransformer(
-                embed_dim=config['embed_dim'],
-                num_heads=config['spatial_num_heads'],
-                dim_feedforward=config['spatial_mlp_dim'],
-                num_layers=config['spatial_num_layers'],
-                patch_size=config['patch_size'],
-                tubelet_size=config['tubelet_size'],
-                image_size=config['image_size']
-            )
-            embed_dim = config['embed_dim']
+            if config.get('use_pretrained_encoder', False) == 'vit':
+                torch._assert(config['tubelet_size'] == 1, "tubelet_size must be 1 when using use_vit==True!")
+                self.spatial_transformer = ViT()
+                embed_dim = 768
+            elif config.get('use_pretrained_encoder', False) == 'resnet':
+                torch._assert(config['tubelet_size'] == 1, "tubelet_size must be 1 when using use_resnet==True!")
+                self.spatial_transformer = ResNetEmbedder()
+                embed_dim = self.spatial_transformer.embed_dim
+            else:
+                self.spatial_transformer = SpatialTransformer(
+                    embed_dim=config['embed_dim'],
+                    num_heads=config['spatial_num_heads'],
+                    dim_feedforward=config['spatial_mlp_dim'],
+                    num_layers=config['spatial_num_layers'],
+                    patch_size=config['patch_size'],
+                    tubelet_size=config['tubelet_size'],
+                    image_size=config['image_size']
+                )
+                embed_dim = config['embed_dim']
 
         self.temporal_transformer = TemporalTransformer(embed_dim=embed_dim,
                                                         num_heads=config['temporal_num_heads'],
-                                                        dim_feedforward=config['temporal_mlp_dim'],
+                                                        # dim_feedforward=config['temporal_mlp_dim'],
                                                         num_layers=config['temporal_num_layers'],
                                                         seq_length=config['max_seq_length'])
         # self.classifier = nn.Linear(embed_dim, num_classes)
@@ -180,16 +220,19 @@ class ViViT(nn.Module):
         )
 
     def forward(self, x, padding_mask):
-        b, t, c, h, w = x.shape
-
-        if self.config['use_pretrained_encoder'] in ['vit', 'resnet']:
-            step = 1
+        if self.use_only_embeddings:
+            spatial_embeddings = x
         else:
-            step = self.config['tubelet_size']
-        padding_mask = padding_mask[:, ::step]
+            b, t, c, h, w = x.shape
 
-        # Process each frame with Spatial Transformer
-        spatial_embeddings = self.spatial_transformer(x)
+            if self.config['use_pretrained_encoder'] in ['vit', 'resnet']:
+                step = 1
+            else:
+                step = self.config['tubelet_size']
+            padding_mask = padding_mask[:, ::step]
+
+            # Process each frame with Spatial Transformer
+            spatial_embeddings = self.spatial_transformer(x)
 
         # Process frame embeddings with Temporal Transformer
         video_embedding = self.temporal_transformer(spatial_embeddings, padding_mask)

@@ -4,7 +4,7 @@ import json
 from torch import nn
 from einops import rearrange
 from vivit import ViViT
-from dataset import VideoDataset, VideoStreamDataset
+from dataset import VideoDataset, VideoStreamDataset, VideoStreamFromEmbeddings
 import time
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -94,7 +94,7 @@ def compute_per_class_metrics(y_true, y_pred, class_names):
     return confusion, per_class_metrics, per_class_accuracy
 
 
-def evaluate(model, data_loader, loss_func, device):
+def evaluate(model, data_loader, loss_func, device, embeddings=False):
     model.eval()
     loss = 0
     correct_predictions = 0
@@ -107,11 +107,14 @@ def evaluate(model, data_loader, loss_func, device):
             # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
 
             # Preprocess data and target
-            x, target, padding_mask = [t.to(device) for t in (data, target, padding_mask)]
-            data = rearrange(x, 'b p h w c -> b p c h w')
+            data, target, padding_mask = [t.to(device) for t in (data, target, padding_mask)]
 
             # Model predictions
-            pred = model(data.float(), padding_mask)
+            if embeddings:
+                pred = model(data, padding_mask)
+            else:
+                data = rearrange(data, 'b p h w c -> b p c h w')
+                pred = model(data.float(), padding_mask)
 
             # Compute loss
             loss += loss_func(pred, target).item()
@@ -132,15 +135,52 @@ def evaluate(model, data_loader, loss_func, device):
         confusion, per_class_metrics, per_class_accuracy = compute_per_class_metrics(all_targets, all_predictions, CLASSES)
 
         # Compute Precision, Recall, and F1 Score
-        precision = precision_score(all_targets, all_predictions, average='weighted', zero_division=0)
-        recall = recall_score(all_targets, all_predictions, average='weighted', zero_division=0)
-        f1 = f1_score(all_targets, all_predictions, average='weighted', zero_division=0)
+        precision = precision_score(all_targets, all_predictions, average='macro', zero_division=0)
+        recall = recall_score(all_targets, all_predictions, average='macro', zero_division=0)
+        f1 = f1_score(all_targets, all_predictions, average='macro', zero_division=0)
 
     return loss, accuracy, confusion, precision, recall, f1, per_class_metrics, per_class_accuracy
 
 
-def train_epoch(epoch, model, optimizer, lr_sched, gradient_accumulation_steps, train_data_loader, eval_data_loader, loss_history, loss_func, device,
-                checkpoint_save_dir, log_step=100, eval_step=-1, save_step=-1, report_to=None, eval_metric='f1'):
+def log_metrics(_step, _metrics, _time_per_iteration, _epoch=None, _report_to='wandb', _train=True, _lr=None,
+                _per_class_metrics=None, _per_class_accuracy=None):
+    """
+    Handles all logging to wandb and printing.
+    """
+    if _train:
+        if _report_to == 'wandb':
+            wandb.log({
+                "train/loss": _metrics['loss'],
+                "train/time_per_iteration": _time_per_iteration,
+                "train/epoch": _epoch,
+                "train/learning_rate": _lr
+            }, step=_step, commit=False)
+    else:  # evaluation
+        if _report_to == 'wandb':
+            # Log per-class metrics
+            if _per_class_metrics:
+                print("Per-class metrics:")
+                for c, m in _per_class_metrics.items():
+                    wandb.log({
+                        f"eval/per_class/{c}/precision": m['precision'],
+                        f"eval/per_class/{c}/recall": m['recall'],
+                        f"eval/per_class/{c}/f1": m['f1'],
+                        f"eval/per_class/{c}/accuracy": _per_class_accuracy[c],
+                    }, step=_step, commit=False)
+                    print(f"{c}: P={m['precision']:.4f}, "
+                          f"R={m['recall']:.4f}, F1={m['f1']:.4f}, "
+                          f"Acc={_per_class_accuracy[c]:.4f}")
+            wandb.log({"eval/loss": _metrics['loss'],
+                       "eval/accuracy": _metrics['accuracy'],
+                       "eval/precision": _metrics['precision'],
+                       "eval/recall": _metrics['recall'],
+                       "eval/f1": _metrics['f1'],
+                       "eval/time_per_evaluation": _time_per_iteration},
+                      step=_step, commit=False)
+
+
+def train_epoch(epoch, model, optimizer, lr_sched, gradient_accumulation_steps, train_data_loader, eval_data_loader,  loss_func, device,
+                checkpoint_save_dir, global_step=0, log_step=100, eval_step=-1, save_step=-1, report_to=None, eval_metric='f1', embeddings=False):
     assert eval_metric in ['loss', 'accuracy', 'f1'], "Metric must be one of: 'loss', 'accuracy', 'f1'"
     total_samples = len(train_data_loader.dataset)
     model.train()
@@ -174,15 +214,17 @@ def train_epoch(epoch, model, optimizer, lr_sched, gradient_accumulation_steps, 
 
     start_time = time.time()
     for i, (data, target, padding_mask) in enumerate(train_data_loader):
+        global_step += 1
         # Use this to visualize the data
         # visualize_frames(data.numpy()[0], CLASSES[target[0].numpy()])
+        data, target, padding_mask = [t.to(device) for t in (data, target, padding_mask)]
         if i % gradient_accumulation_steps == 0:
             optimizer.zero_grad()
-
-        x, target, padding_mask = [t.to(device) for t in (data, target, padding_mask)]
-        data = rearrange(x, 'b p h w c -> b p c h w')
-
-        pred = model(data.float(), padding_mask)
+        if embeddings:
+            pred = model(data, padding_mask)
+        else:
+            data = rearrange(data, 'b p h w c -> b p c h w')
+            pred = model(data.float(), padding_mask)
 
         loss = loss_func(pred, target)
         loss = loss / gradient_accumulation_steps  # Normalize loss
@@ -193,31 +235,19 @@ def train_epoch(epoch, model, optimizer, lr_sched, gradient_accumulation_steps, 
 
         end_time = time.time()
 
-        if lr_sched.last_epoch == 0:
-            continue
-
-        if lr_sched.last_epoch % eval_step == 0 and eval_step != -1:
+        if global_step % eval_step == 0 and eval_step != -1:
             print('Evaluation started.')
             eval_start_time = time.time()
-            eval_loss, acc, confusion, precision, recall, f1, per_class_metrics, per_class_accuracy = evaluate(model, eval_data_loader, loss_func, device)
+            eval_loss, acc, confusion, precision, recall, f1, per_class_metrics, per_class_accuracy = evaluate(model, eval_data_loader, loss_func, device, embeddings=embeddings)
             eval_end_time = time.time()
-            if train_config['report_to'] == 'wandb':
-                wandb.log({"eval/loss": eval_loss,
-                           "eval/accuracy": acc,
-                           "eval/precision": precision,
-                           "eval/recall": recall,
-                           "eval/f1": f1,
-                           "eval/time_per_evaluation": eval_end_time - eval_start_time,},
-                          step=lr_sched.last_epoch, commit=False)
-
-                # Log per-class metrics
-                for class_name, metrics in per_class_metrics.items():
-                    wandb.log({
-                        f"eval/per_class/{class_name}/precision": metrics['precision'],
-                        f"eval/per_class/{class_name}/recall": metrics['recall'],
-                        f"eval/per_class/{class_name}/f1": metrics['f1'],
-                        f"eval/per_class/{class_name}/accuracy": per_class_accuracy[class_name],
-                    }, step=lr_sched.last_epoch, commit=False)
+            log_metrics(_step=global_step, _time_per_iteration=eval_end_time - eval_start_time,
+                        _metrics={'loss': eval_loss,
+                                  'accuracy': acc,
+                                  'f1': f1,
+                                  'precision': precision,
+                                  'recall': recall},
+                        _report_to=report_to, _train=False,
+                        _per_class_metrics=per_class_metrics, _per_class_accuracy=per_class_accuracy)
 
             print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}, precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}')
             print("Per-class metrics:")
@@ -232,39 +262,7 @@ def train_epoch(epoch, model, optimizer, lr_sched, gradient_accumulation_steps, 
                 plot_path = os.path.join(confusion_matrix_path, 'confusion_{}-{}.jpg'.format(epoch, i))
                 plot_confusion_matrix(confusion, CLASSES, plot_path)
 
-        if lr_sched.last_epoch % log_step == 0:
-            # Log to wandb
-            if report_to == 'wandb':
-                wandb.log({"train/loss": loss.item(),
-                           "train/time_per_iteration": (end_time - start_time) / log_step,
-                           "train/epoch": epoch,
-                           "train/learning_rate": optimizer.param_groups[0]['lr']},
-                          step=lr_sched.last_epoch, commit=True)
-
-            print('[' + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
-                  ' (' + '{:3.0f}'.format(100 * i / len(train_data_loader)) + '%)]  Loss: ' +
-                  '{:6.4f}'.format(loss.item()))
-            loss_history.append(loss.item())
-
-            if args.verbose:
-                if i >= log_step * 5:
-                    avg_loss = sum(loss_history[-log_step * 5:]) / (log_step * 5)
-                    outlier_thr = 0.8
-                    predicted_class = pred.argmax(dim=1)
-                    if loss > avg_loss * (2 - outlier_thr):
-                        print('High loss')
-                        print('Target classes:    {}'.format(target_to_string(target)))
-                        print('Predicted classes: {}'.format(target_to_string(predicted_class)))
-                        print('----------')
-                    elif loss < avg_loss * outlier_thr:
-                        print('Low loss')
-                        print('Target classes:    {}'.format(target_to_string(target)))
-                        print('Predicted classes: {}'.format(target_to_string(predicted_class)))
-                        print('----------')
-
-            start_time = time.time()
-
-        if lr_sched.last_epoch % save_step == 0 and save_step != -1:
+        if global_step % save_step == 0 and save_step != -1:
             checkpoint_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
             os.makedirs(checkpoint_save_dir, exist_ok=True)
             checkpoint = {
@@ -278,29 +276,21 @@ def train_epoch(epoch, model, optimizer, lr_sched, gradient_accumulation_steps, 
             update_best_checkpoints(checkpoint_path, metric_value)
             print('Model successfully saved to {}'.format(checkpoint_path))
 
-    print('End of epoch.')
-    print('Evaluation started.')
-    eval_loss, acc, confusion, precision, recall, f1, per_class_metrics, per_class_accuracy = evaluate(model, eval_data_loader, loss_func, device)
-    print(f'Eval loss: {eval_loss:.4f}, eval accuracy: {acc:.4f}, precision: {precision:.4f}, recall: {recall:.4f}, f1: {f1:.4f}')
-    if args.verbose:
-        confusion_matrix_path = os.path.join(checkpoint_save_dir, 'confusion')
-        os.makedirs(confusion_matrix_path, exist_ok=True)
-        plot_path = os.path.join(confusion_matrix_path, 'confusion_{}-{}.jpg'.format(epoch, i))
-        plot_confusion_matrix(confusion, CLASSES, plot_path)
+        if global_step % log_step == 0:
+            # Log to wandb
+            log_metrics(_step=global_step, _epoch=epoch, _metrics={'loss': loss.item()},
+                        _time_per_iteration=(end_time - start_time) / log_step,
+                        _report_to=train_config['report_to'], _train=True,
+                        _lr=optimizer.param_groups[0]['lr'])
+            wandb.log({}, step=global_step, commit=True)
 
-    checkpoint_path = os.path.join(checkpoint_save_dir, 'model_{}-{}.pth'.format(epoch, i))
-    os.makedirs(checkpoint_save_dir, exist_ok=True)
-    checkpoint = {
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'scheduler_state_dict': lr_sched.state_dict(),
-        'loss': loss,
-    }
-    torch.save(checkpoint, checkpoint_path)
-    update_best_checkpoints(checkpoint_path, metric_value)
-    print('Model successfully saved to {}'.format(checkpoint_path))
-    return loss_history
+            print('[Epoch {:2}] ['.format(epoch) + '{:5}'.format(i * len(data)) + '/' + '{:5}'.format(total_samples) +
+                  ' (' + '{:3.0f}'.format(100 * i / len(train_data_loader)) + '%)]  Loss: ' +
+                  '{:6.4f}'.format(loss.item()))
+            start_time = time.time()
+
+    print('End of epoch.')
+    return global_step
 
 
 def dataset_distribution(dataset, plot=False):
@@ -467,6 +457,14 @@ def create_datasets(dataset_type: str, **kwargs):
                                      num_threads=data_config['decord_num_threads'],
                                      max_readers=1,
                                      normalize=data_config['normalize'],)
+    elif dataset_type == 'embeddings':
+        train_dataset = VideoStreamFromEmbeddings(load_from_json=data_config['train_json'],
+                                                  classes=classes,
+                                                  embeddings_file=data_config['embeddings_file'])
+        val_dataset = VideoStreamFromEmbeddings(load_from_json=data_config['val_json'],
+                                                classes=classes,
+                                                embeddings_file=data_config['embeddings_file'])
+
     return train_dataset, val_dataset
 
 
@@ -506,7 +504,7 @@ if __name__ == "__main__":
     warmup_epochs = train_config['warmup_epochs']
     learning_rate = train_config['learning_rate']
 
-    model = ViViT(model_config)
+    model = ViViT(model_config, use_only_embeddings=True if data_config['dataset_type'] == 'embeddings' else False)
 
     # Move model to device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -520,7 +518,7 @@ if __name__ == "__main__":
     # Create dataset
     start = time.time()
     print('Loading dataset...')
-    assert data_config['dataset_type'] in ['one_class', 'stream'], f'Dataset type {data_config["dataset_type"]} not supported'
+    assert data_config['dataset_type'] in ['one_class', 'stream', 'embeddings'], f'Dataset type {data_config["dataset_type"]} not supported'
     train_dataset, val_dataset = create_datasets(data_config['dataset_type'], classes = CLASSES, data_config=data_config)
 
     end = time.time()
@@ -556,11 +554,8 @@ if __name__ == "__main__":
         criterion = nn.CrossEntropyLoss(weight=cls_weights, label_smoothing=label_smoothing)
     elif train_config['loss'] == 'seesaw':
         from utils.seesaw_loss import SeesawLossWithLogits
-        # class_counts = defaultdict(int)
-        class_counts = [0] * len(CLASSES)
-        print('Counting classes for SeeSawLoss...')
-        for _, label, _ in train_dataset:  # Assuming dataset returns (data, label)
-            class_counts[label] += 1
+        class_counts = get_class_counts(data_config, CLASSES)
+        class_counts = [class_counts.get(cls, 0) for cls in CLASSES]
         criterion = SeesawLossWithLogits(class_counts=class_counts)
     else:
         raise ValueError('Loss {} not recognized.'.format(train_config['loss']))
@@ -608,7 +603,7 @@ if __name__ == "__main__":
 
         print(f'Model successfully loaded from {train_config["load_from_checkpoint"]}.')
 
-    train_loss_history, test_loss_history = [], []
+    global_step = 0
 
     checkpoint_save_dir = os.path.join(train_config['checkpoint_save_dir'], model_name)
     os.makedirs(checkpoint_save_dir, exist_ok=True)
@@ -619,18 +614,19 @@ if __name__ == "__main__":
     for e in range(num_epochs):
         epoch = start_epoch + e
         print('Epoch:', epoch)
-        train_loss_history = train_epoch(epoch, model, optimizer, lr_sched,
+        global_step = train_epoch(epoch, model, optimizer, lr_sched,
                                          gradient_accumulation_steps = train_config['gradient_accumulation_steps'],
                                          train_data_loader=train_dataloader,
                                          eval_data_loader=val_dataloader,
-                                         loss_history=train_loss_history,
+                                         global_step=global_step,
                                          loss_func=criterion,
                                          device=device,
                                          log_step=train_config['log_step'],
                                          eval_step=train_config['eval_step'],
                                          save_step=train_config['save_step'],
                                          checkpoint_save_dir=checkpoint_save_dir,
-                                         report_to=train_config['report_to'])
+                                         report_to=train_config['report_to'],
+                                         embeddings=True if data_config['dataset_type'] == 'embeddings' else False,)
 
     print('Training finished.')
     model_path = os.path.join(os.path.join(train_config['checkpoint_save_dir'], model_name), 'model_final.pt')

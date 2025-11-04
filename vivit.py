@@ -154,8 +154,6 @@ class TemporalTransformer(nn.Module):
         self.pos_embed = nn.Parameter(torch.zeros(1, seq_length + 1, embed_dim))
         nn.init.normal_(self.pos_embed, std=0.02)
 
-        # self.norm = nn.LayerNorm(embed_dim)
-
     def forward(self, x, padding_mask=None):
         """
         x: (B, T, D)
@@ -175,7 +173,6 @@ class TemporalTransformer(nn.Module):
 
         # Forward through transformer
         x = self.encoder(x, src_key_padding_mask=padding_mask)
-        # x = self.norm(x)
 
         return x[:, 0]  # return CLS token
 

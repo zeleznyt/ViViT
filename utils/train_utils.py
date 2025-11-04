@@ -35,14 +35,16 @@ def init_wandb(project_name, config, name=None):
     wandb.init(project=project_name, config=config, name=name)
 
 
-def get_class_weights(data_config, classes):
+def get_class_counts(data_config, classes):
     """
-    Return weights for each class based on their count in train json
+    Return the number of samples per class from the training JSON file.
+    Falls back to default counts if the file doesn't exist.
     :param data_config: data config
-    :return: weights for each class
+    :param classes: list of classes
+    :return: counts for each class
     """
-    # train_data_path = data_config['train_json']
-    train_data_path = '/home/zeleznyt/Downloads/train_data.json'
+    train_data_path = data_config['train_json']
+    # train_data_path = '/home/zeleznyt/Downloads/train_data.json'
     if train_data_path and os.path.exists(train_data_path):
         with open(train_data_path) as f:
             data = json.load(f)
@@ -61,6 +63,18 @@ def get_class_weights(data_config, classes):
          'upoutávka': 15830,
          'grafika': 13361,
          'předěl': 12031}
+    print(counts)
+    return counts
+
+
+def get_class_weights(data_config, classes):
+    """
+    Return weights for each class based on their count in train json
+    :param data_config: data config
+    :param classes: list of classes
+    :return: weights for each class
+    """
+    counts = get_class_counts(data_config, classes)
 
     # Total samples and num classes
     total = sum(counts.values())

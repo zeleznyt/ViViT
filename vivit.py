@@ -105,34 +105,6 @@ class ResNetEmbedder(nn.Module):
         return x  # (b, t, embed_dim)
 
 
-# class TemporalTransformer(nn.Module):
-#     def __init__(self, embed_dim=768, num_heads=12, dim_feedforward=2048, num_layers=12, seq_length=16):
-#         super(TemporalTransformer, self).__init__()
-#         encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, dim_feedforward=dim_feedforward,
-#                                                    batch_first=True)
-#         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-#
-#         self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # randn like ViT/BERT
-#         self.pos_embed = nn.Parameter(torch.empty(1, seq_length + 1, embed_dim).normal_(std=0.02))  # from BERT
-#         self.norm_layer = nn.LayerNorm(embed_dim)
-#
-#     def forward(self, x, padding_mask=None):
-#         b, t, n = x.shape
-#         # Add temporal CLS token
-#         cls_token = repeat(self.cls_token, '() t n -> b t n', b=b)
-#         x = torch.cat((cls_token, x), dim=1)
-#         cls_mask = torch.zeros(b, 1, dtype=torch.bool, device=padding_mask.device)  # always zeros (token never masked)
-#         padding_mask = torch.cat((cls_mask, padding_mask), dim=1)
-#
-#         # Add positional encoding
-#         x += self.pos_embed[:, :t + 1]
-#
-#         x = self.encoder(x, src_key_padding_mask=padding_mask)
-#         x = self.norm_layer(x)
-#
-#         return x[:, 0]  # Return the class token (batch_size, embed_dim)
-
-
 class TemporalTransformer(nn.Module):
     def __init__(self, embed_dim=768, num_heads=8, num_layers=2, dropout=0.1, seq_length=16):
         super().__init__()
@@ -148,11 +120,8 @@ class TemporalTransformer(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
         # CLS token and positional embedding
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim)) # TODO: zeros vs randn
-        nn.init.normal_(self.cls_token, std=0.02)
-
-        self.pos_embed = nn.Parameter(torch.zeros(1, seq_length + 1, embed_dim))
-        nn.init.normal_(self.pos_embed, std=0.02)
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))  # randn like ViT/BERT
+        self.pos_embed = nn.Parameter(torch.empty(1, seq_length + 1, embed_dim).normal_(std=0.02))  # from BERT
 
     def forward(self, x, padding_mask=None):
         """
@@ -161,7 +130,7 @@ class TemporalTransformer(nn.Module):
         """
         b, t, d = x.shape
 
-        cls_token = repeat(self.cls_token, '() n d -> b n d', b=b)
+        cls_token = repeat(self.cls_token, '() t n -> b t n', b=b)
         x = torch.cat((cls_token, x), dim=1)
 
         if padding_mask is not None:

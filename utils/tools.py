@@ -146,8 +146,40 @@ def merge_two_eaf_files(reference_eaf, prediction_eaf, output_path):
     print('Result saved to', output_file)
     return output_file
 
+
+def compare_jsons(json_a_path, json_b_path):
+    with open(json_a_path, "r") as f:
+        data_a = json.load(f)
+    with open(json_b_path, "r") as f:
+        data_b = json.load(f)
+
+    # Convert to tuples for hashability
+    set_a = {tuple([item[0], tuple(item[1]), item[2]]) for item in data_a}
+    set_b = {tuple([item[0], tuple(item[1]), item[2]]) for item in data_b}
+
+    only_in_a = set_a - set_b
+    only_in_b = set_b - set_a
+
+    print(f"Items only in {json_a_path}: {len(only_in_a)}")
+    print(f"Items only in {json_b_path}: {len(only_in_b)}")
+
+    return list(only_in_a), list(only_in_b)
+
+
 if __name__ == "__main__":
-    reference_eaf = "/media/zeleznyt/DATA/repo/ViViT/example_data_RAVDAI/ct24 2023-10-02 01.27.34_example.eaf"
-    prediction_eaf = "/media/zeleznyt/DATA/repo/ViViT/example_data_RAVDAI/predictions.eaf"
-    output_path = "/media/zeleznyt/DATA/repo/ViViT/example_data_RAVDAI/"
-    output_file = merge_two_eaf_files(reference_eaf, prediction_eaf, output_path)
+    # reference_eaf = "/media/zeleznyt/DATA/data/RAVDAI/_demo/test_sample/reference_barrandov 2024-01-29 15.17.44.eaf"
+    # prediction_eaf = "/media/zeleznyt/DATA/data/RAVDAI/_demo/test_sample/prediction_barrandov 2024-01-29 15.17.44.eaf"
+    # output_path = "/media/zeleznyt/DATA/data/RAVDAI/_demo/test_sample"
+    # output_file = merge_two_eaf_files(reference_eaf, prediction_eaf, output_path)
+
+    # Example usage:
+    json_a = "/media/zeleznyt/DATA/repo/ViViT/dataset_split/25-10-final/train_data-fixed.json"
+    json_b = "/media/zeleznyt/DATA/repo/ViViT/dataset_split/stream_train_data.json"
+
+    missing_a, missing_b = compare_jsons(json_a, json_b)
+
+    # Optional: save results
+    with open("missing_in_b.json", "w") as f:
+        json.dump(missing_a, f, indent=2)
+    with open("missing_in_a.json", "w") as f:
+        json.dump(missing_b, f, indent=2)

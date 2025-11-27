@@ -398,7 +398,7 @@ class VideoStreamDataset(VideoDataset):
                 mid_frame = self.context_size * sampling
 
                 video_len = get_video_length_opencv(annotation_file['video'])
-                max_data_len = min(annotation_list[-1][1], video_len)
+                max_data_len = min(annotation_list[-1][1], video_len/self.input_fps*self.step)
 
                 while (mid_frame + self.context_size * sampling) / self.input_fps * self.step <= max_data_len:
                     indexes = list(np.arange(mid_frame - (self.context_size * sampling),

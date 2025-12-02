@@ -152,7 +152,7 @@ class ViViT(nn.Module):
         self.config = config
         self.use_only_embeddings = use_only_embeddings
         if self.use_only_embeddings:
-            self.spatial_transformer = ViT()
+            self.spatial_transformer = None
             embed_dim = 768
         else:
             if config.get('use_pretrained_encoder', False) == 'vit':

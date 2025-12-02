@@ -18,9 +18,9 @@ def get_device():
 
 
 class ViViTpredictor():
-    def __init__(self, config, checkpoint_path):
+    def __init__(self, config, checkpoint_path, device):
         self.config = config
-        self.device = get_device()
+        self.device = device
         self.classes = CLASSES
         self.window_length = 17
         self.embed_dim = 768
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     config = load_config(args.config)
     model_config = config['model']
     checkpoint_path = config['evaluation']['checkpoint']
-    predictor = ViViTpredictor(model_config, checkpoint_path)
+    predictor = ViViTpredictor(model_config, checkpoint_path, device=get_device())
     # input_video = [np.random.rand(240, 426, 3) for _ in range(80)] # List of ndarrays
 
     n_frames_to_load = 250

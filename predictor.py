@@ -139,8 +139,6 @@ if __name__ == '__main__':
 
     for i, input_frame in enumerate(input_video):
         start_time = time.time()
-        if i*fps >= 400:
-            print(i*fps)
         result, probs = predictor.predict_class_with_probs(input_frame)
         probs_rounded = {k: f"{v:.2f}" for k, v in probs.items()}
         print(f'Predicted class at {frame_to_timestamp(i-8)}: {result}. All probabilities: {probs_rounded}')

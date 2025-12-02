@@ -128,8 +128,11 @@ if __name__ == '__main__':
     model_config = config['model']
     checkpoint_path = config['evaluation']['checkpoint']
     predictor = ViViTpredictor(model_config, checkpoint_path, device=get_device())
+
+    # Process random data sample
     # input_video = [np.random.rand(240, 426, 3) for _ in range(80)] # List of ndarrays
 
+    # Process mp4 video
     n_frames_to_load = 250
     fps = 25
     indices = list(range(0, n_frames_to_load * fps, fps))

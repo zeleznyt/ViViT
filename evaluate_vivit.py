@@ -104,6 +104,9 @@ def evaluate_raw_video(video_path, annotation_path, input_fps=25, frame_sample_r
     while idx / input_fps * step < max_data_len:
         label = get_label_on_idx((idx-(context_size*input_fps))/input_fps*step, annotation_list)
         if label == -1 or label == 'nedefinováno':
+            frames.append(vr[idx + sampling].asnumpy())
+            # Drop the first one
+            frames.pop(0)
             idx += input_fps*frame_sample_rate
             continue
         label = torch.tensor(CLASSES.index(label))
@@ -114,8 +117,8 @@ def evaluate_raw_video(video_path, annotation_path, input_fps=25, frame_sample_r
         processed_video = processed_video.unsqueeze(0)
 
         data, target, padding_mask = [t.to(device) for t in (processed_video, label.unsqueeze(0), padding_mask)]
-
-        pred = model(data.float(), padding_mask)
+        with torch.no_grad():
+            pred = model(data.float(), padding_mask)
 
         predicted_class = pred.argmax(dim=1)  # Get the predicted class
         all_predictions.extend(predicted_class.cpu().numpy())  # Save predictions

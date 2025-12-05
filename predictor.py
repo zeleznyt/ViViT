@@ -25,6 +25,7 @@ class ViViTpredictor():
         self.window_length = 17
         self.embed_dim = 768
         self.embed_frames = torch.zeros(self.window_length, self.embed_dim, device=self.device)
+        self.padding_mask = torch.ones(self.window_length, dtype=torch.bool, device=self.device)
         self.filled = 0
         self.frames = []
 
@@ -65,34 +66,31 @@ class ViViTpredictor():
                       Frame shape: height x width x channels (standard decord output)
         :return: predicted_class (int), probs (list):
         """
-        self.frames.append(frame)
-
-        preprocessed_frame = preprocess_video(np.expand_dims(frame, axis=0), normalize=True)
-        preprocessed_frame = preprocessed_frame.to(self.device)
-        preprocessed_frame = rearrange(preprocessed_frame, 'b h w c -> b c h w')
-        with torch.no_grad():
-            emb = self.spatial_encoder(preprocessed_frame)  # (1, D)
-
-        if self.filled < self.window_length:
-            self.filled += 1
+        if frame is None:
+            emb = torch.zeros(1, self.embed_dim, device=self.device)
+            pad = True
         else:
-            print(self.filled)
-            self.frames.pop(0)
+            self.frames.append(frame)
+
+            preprocessed_frame = preprocess_video(np.expand_dims(frame, axis=0), normalize=True)
+            preprocessed_frame = preprocessed_frame.to(self.device)
+            preprocessed_frame = rearrange(preprocessed_frame, 'b h w c -> b c h w')
+            with torch.no_grad():
+                emb = self.spatial_encoder(preprocessed_frame)  # (1, D)
+
+            if self.filled < self.window_length:
+                self.filled += 1
+            else:
+                print(self.filled)
+                self.frames.pop(0)
+            pad = False
 
         self.embed_frames = torch.roll(self.embed_frames, shifts=-1, dims=0)
         self.embed_frames[-1] = emb
+        self.padding_mask = torch.roll(self.padding_mask, shifts=-1, dims=0)
+        self.padding_mask[-1] = pad
 
-        # Padding mask
-        seq_len = self.filled
-        pad_len = self.window_length - seq_len
-
-        # Create a boolean tensor for the padding mask
-        padding_mask = torch.cat([
-            torch.ones(pad_len, dtype=torch.bool),
-            torch.zeros(seq_len, dtype=torch.bool)
-        ]).to(self.device)
-
-        embed_frames, padding_mask = [t.unsqueeze(0) for t in (self.embed_frames, padding_mask)]
+        embed_frames, padding_mask = [t.unsqueeze(0) for t in (self.embed_frames, self.padding_mask)]
         with torch.no_grad():
             pred = self.temporal_encoder(embed_frames, padding_mask)
 
@@ -143,6 +141,13 @@ if __name__ == '__main__':
     for i, input_frame in enumerate(input_video):
         start_time = time.time()
         result, probs = predictor.predict_class_with_probs(input_frame)
+        probs_rounded = {k: f"{v:.2f}" for k, v in probs.items()}
+        print(f'Predicted class at {frame_to_timestamp(i-8)}: {result}. All probabilities: {probs_rounded}')
+        print('Time elapsed during inference:', time.time() - start_time)
+
+    for i in range(8):
+        start_time = time.time()
+        result, probs = predictor.predict_class_with_probs(None)
         probs_rounded = {k: f"{v:.2f}" for k, v in probs.items()}
         print(f'Predicted class at {frame_to_timestamp(i-8)}: {result}. All probabilities: {probs_rounded}')
         print('Time elapsed during inference:', time.time() - start_time)

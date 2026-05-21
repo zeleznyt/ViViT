@@ -1,0 +1,2 @@
+onnxruntime-gpu
+nvidia-cudnn-cu12

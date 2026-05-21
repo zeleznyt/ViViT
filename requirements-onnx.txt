@@ -1,0 +1,13 @@
+av
+numpy
+torch
+torchvision
+onnx
+onnxruntime
+opencv-python
+decord
+matplotlib
+einops
+pyyaml
+wandb
+scikit-learn
